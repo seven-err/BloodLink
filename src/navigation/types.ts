@@ -1,0 +1,13 @@
+export type AuthStackParamList = {
+  Welcome: undefined;
+  Signup: undefined;
+  EnterPhone: {
+    mode: 'signup' | 'login';
+  };
+  VerifyOtp: {
+    phone: string;
+    mode: 'signup' | 'login';
+  };
+  Login: undefined;
+  ProfileCompletion: undefined;
+};

@@ -1,0 +1,5 @@
+﻿blank_issues_enabled: false
+contact_links:
+  - name: Development setup help
+    url: https://github.com/seven-err/BloodLink
+    about: Use the repository README/docs for setup questions before opening an issue.
