@@ -2,11 +2,17 @@ import { NavigationContainer } from '@react-navigation/native';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '@/context/AuthContext';
+import { RestrictedAccessScreen } from '@/screens/RestrictedAccessScreen';
+import { isMobileAppRole, isStaffRole } from '@/utils/roles';
 import { AppNavigator } from './AppNavigator';
 import { AuthNavigator } from './AuthNavigator';
 
 export function RootNavigator() {
-  const { authError, initializing, profileComplete, session } = useAuth();
+  const { authError, initializing, profile, profileComplete, session } = useAuth();
+  const showRestrictedAccess = Boolean(session && isStaffRole(profile?.role));
+  const showApp = Boolean(
+    session && profileComplete && isMobileAppRole(profile?.role),
+  );
 
   if (initializing) {
     return (
@@ -20,7 +26,9 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer>
-      {session && profileComplete ? (
+      {showRestrictedAccess ? (
+        <RestrictedAccessScreen />
+      ) : showApp ? (
         <AppNavigator />
       ) : (
         <AuthNavigator

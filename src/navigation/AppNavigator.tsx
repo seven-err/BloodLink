@@ -5,7 +5,9 @@ import { StyleSheet, Text, View } from 'react-native';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { useAuth } from '@/context/AuthContext';
 import type { AppStackParamList } from '@/navigation/types';
+import { RestrictedAccessScreen } from '@/screens/RestrictedAccessScreen';
 import { signOut } from '@/services/supabase/auth';
+import { isMobileAppRole } from '@/utils/roles';
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 
@@ -89,8 +91,13 @@ function AppProfileScreen() {
 
 export function AppNavigator() {
   const { profile } = useAuth();
+
+  if (!isMobileAppRole(profile?.role)) {
+    return <RestrictedAccessScreen />;
+  }
+
   const initialRouteName: HomeRouteName =
-    profile?.role === 'donor' ? 'DonorHome' : 'RecipientHome';
+    profile.role === 'donor' ? 'DonorHome' : 'RecipientHome';
 
   return (
     <Stack.Navigator
