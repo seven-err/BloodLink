@@ -18,6 +18,8 @@ export type BloodRequestStatus =
   | 'cancelled'
   | 'expired';
 
+export type BloodRequestUrgency = 'normal' | 'urgent' | 'critical';
+
 export type DonorVerificationStatus =
   | 'pending'
   | 'approved'
@@ -85,10 +87,13 @@ export type Database = {
           phone: string | null;
           blood_type: BloodType | null;
           birthdate: string | null;
+          weight_kg: number | null;
+          last_donation_at: string | null;
           organization_name: string | null;
           avatar_path: string | null;
           latitude: number | null;
           longitude: number | null;
+          location: unknown | null;
           address: string | null;
           is_available: boolean;
           created_at: string;
@@ -101,6 +106,8 @@ export type Database = {
           phone?: string | null;
           blood_type?: BloodType | null;
           birthdate?: string | null;
+          weight_kg?: number | null;
+          last_donation_at?: string | null;
           organization_name?: string | null;
           avatar_path?: string | null;
           latitude?: number | null;
@@ -109,6 +116,129 @@ export type Database = {
           is_available?: boolean;
         };
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
+        Relationships: [];
+      };
+      donor_verifications: {
+        Row: {
+          id: string;
+          donor_id: string;
+          status: DonorVerificationStatus;
+          document_path: string;
+          notes: string | null;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          expires_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          donor_id: string;
+          status?: DonorVerificationStatus;
+          document_path: string;
+          notes?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          expires_at?: string | null;
+        };
+        Update: Partial<
+          Database['public']['Tables']['donor_verifications']['Insert']
+        >;
+        Relationships: [];
+      };
+      blood_requests: {
+        Row: {
+          id: string;
+          requester_id: string;
+          blood_type: BloodType;
+          units_needed: number;
+          status: BloodRequestStatus;
+          urgency: BloodRequestUrgency;
+          patient_name: string | null;
+          hospital_name: string;
+          contact_phone: string | null;
+          attachment_path: string | null;
+          notes: string | null;
+          needed_at: string | null;
+          address: string | null;
+          latitude: number | null;
+          longitude: number | null;
+          location: unknown | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          requester_id: string;
+          blood_type: BloodType;
+          units_needed: number;
+          status?: BloodRequestStatus;
+          urgency?: BloodRequestUrgency;
+          patient_name?: string | null;
+          hospital_name: string;
+          contact_phone?: string | null;
+          attachment_path?: string | null;
+          notes?: string | null;
+          needed_at?: string | null;
+          address?: string | null;
+          latitude?: number | null;
+          longitude?: number | null;
+        };
+        Update: Partial<
+          Database['public']['Tables']['blood_requests']['Insert']
+        >;
+        Relationships: [];
+      };
+      donor_matches: {
+        Row: {
+          id: string;
+          request_id: string;
+          donor_id: string;
+          status: DonorMatchStatus;
+          distance_meters: number | null;
+          travel_time_seconds: number | null;
+          responded_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          request_id: string;
+          donor_id: string;
+          status?: DonorMatchStatus;
+          distance_meters?: number | null;
+          travel_time_seconds?: number | null;
+          responded_at?: string | null;
+        };
+        Update: Partial<Database['public']['Tables']['donor_matches']['Insert']>;
+        Relationships: [];
+      };
+      donations: {
+        Row: {
+          id: string;
+          match_id: string;
+          donor_id: string;
+          request_id: string;
+          status: DonationStatus;
+          scheduled_at: string | null;
+          completed_at: string | null;
+          units_donated: number | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          match_id: string;
+          donor_id: string;
+          request_id: string;
+          status?: DonationStatus;
+          scheduled_at?: string | null;
+          completed_at?: string | null;
+          units_donated?: number | null;
+          notes?: string | null;
+        };
+        Update: Partial<Database['public']['Tables']['donations']['Insert']>;
         Relationships: [];
       };
       notifications: {
@@ -268,6 +398,22 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      is_admin: {
+        Args: {
+          user_id?: string;
+        };
+        Returns: boolean;
+      };
+      is_donor_verification_active: {
+        Args: {
+          donor_id: string;
+        };
+        Returns: boolean;
+      };
+      is_elevated_role_context: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
       nearby_eligible_donors: {
         Args: {
           request_id: string;
@@ -280,6 +426,12 @@ export type Database = {
           blood_type: BloodType;
           distance_meters: number;
         }[];
+      };
+      sanitize_user_role: {
+        Args: {
+          raw_role: string;
+        };
+        Returns: UserRole;
       };
     };
     Enums: {
