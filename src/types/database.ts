@@ -396,10 +396,38 @@ export type Database = {
         Relationships: [];
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      open_blood_requests_feed: {
+        Row: {
+          id: string;
+          blood_type: BloodType;
+          units_needed: number;
+          urgency: BloodRequestUrgency;
+          needed_at: string | null;
+          latitude: number | null;
+          longitude: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Relationships: [];
+      };
+    };
     Functions: {
       is_admin: {
         Args: {
+          user_id?: string;
+        };
+        Returns: boolean;
+      };
+      is_bloodbank: {
+        Args: {
+          user_id?: string;
+        };
+        Returns: boolean;
+      };
+      is_matched_donor_for_request: {
+        Args: {
+          request_id: string;
           user_id?: string;
         };
         Returns: boolean;
