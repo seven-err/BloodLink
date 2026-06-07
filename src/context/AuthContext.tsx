@@ -16,26 +16,27 @@ import {
   isProfileComplete,
   type Profile,
 } from '@/services/supabase/profiles';
+import { sanitizeAuthError } from '@/utils/authErrors';
 
 type AuthContextValue = {
   authError: string | null;
+  authRetrying: boolean;
   initializing: boolean;
   session: Session | null;
   profile: Profile;
   profileComplete: boolean;
   refreshProfile: () => Promise<void>;
+  retryAuth: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-const getErrorMessage = (error: unknown, fallback: string) =>
-  error instanceof Error ? error.message : fallback;
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [initializing, setInitializing] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authRetrying, setAuthRetrying] = useState(false);
   const mountedRef = useRef(false);
   const profileRequestIdRef = useRef(0);
 
@@ -70,7 +71,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     } catch (error) {
       applyProfileState(() => {
         setProfile(null);
-        setAuthError(getErrorMessage(error, 'Unable to load your profile.'));
+        setAuthError(sanitizeAuthError(error, 'Unable to load your profile.'));
       });
     }
   }, []);
@@ -78,6 +79,40 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const refreshProfile = useCallback(async () => {
     await loadProfile(session);
   }, [loadProfile, session]);
+
+  const retryAuth = useCallback(async () => {
+    if (authRetrying) {
+      return;
+    }
+
+    setAuthRetrying(true);
+    setAuthError(null);
+
+    try {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        throw error;
+      }
+
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setSession(data.session);
+      await loadProfile(data.session);
+    } catch (error) {
+      if (mountedRef.current) {
+        setSession(null);
+        setProfile(null);
+        setAuthError(sanitizeAuthError(error, 'Unable to start the app.'));
+      }
+    } finally {
+      if (mountedRef.current) {
+        setAuthRetrying(false);
+      }
+    }
+  }, [authRetrying, loadProfile]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -100,7 +135,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         if (mountedRef.current) {
           setSession(null);
           setProfile(null);
-          setAuthError(getErrorMessage(error, 'Unable to initialize auth.'));
+          setAuthError(sanitizeAuthError(error, 'Unable to initialize auth.'));
         }
       } finally {
         if (mountedRef.current) {
@@ -142,13 +177,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const value = useMemo(
     () => ({
       authError,
+      authRetrying,
       initializing,
       profile,
       profileComplete: isProfileComplete(profile),
       refreshProfile,
+      retryAuth,
       session,
     }),
-    [authError, initializing, profile, refreshProfile, session],
+    [authError, authRetrying, initializing, profile, refreshProfile, retryAuth, session],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

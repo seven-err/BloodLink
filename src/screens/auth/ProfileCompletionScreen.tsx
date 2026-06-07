@@ -60,7 +60,7 @@ type Coordinates = {
 };
 
 export function ProfileCompletionScreen() {
-  const { authError, session, profile, refreshProfile } = useAuth();
+  const { session, profile, refreshProfile } = useAuth();
   const [coordinates, setCoordinates] = useState<Coordinates>({
     latitude: profile?.latitude ?? null,
     longitude: profile?.longitude ?? null,
@@ -203,7 +203,6 @@ export function ProfileCompletionScreen() {
         <Text style={authStyles.subtitle}>
           Tell us the essentials so BloodLink can match requests safely.
         </Text>
-        {authError ? <Text style={authStyles.error}>{authError}</Text> : null}
         <Controller
           control={control}
           name="fullName"

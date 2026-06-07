@@ -2,6 +2,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '@/context/AuthContext';
+import { AuthProfileErrorScreen } from '@/screens/AuthProfileErrorScreen';
 import { RestrictedAccessScreen } from '@/screens/RestrictedAccessScreen';
 import { isMobileAppRole, isStaffRole } from '@/utils/roles';
 import { AppNavigator } from './AppNavigator';
@@ -22,6 +23,10 @@ export function RootNavigator() {
         {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
       </View>
     );
+  }
+
+  if (authError) {
+    return <AuthProfileErrorScreen />;
   }
 
   return (
