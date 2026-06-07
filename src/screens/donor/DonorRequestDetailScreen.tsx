@@ -17,6 +17,7 @@ import {
   type DonorMatch,
   type MatchedBloodRequestDetails,
 } from '@/services/supabase/donorMatches';
+import { isQrEligibleMatchStatus } from '@/services/supabase/donations';
 import {
   getOpenBloodRequestById,
   type OpenBloodRequestFeedItem,
@@ -318,6 +319,17 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
       ) : null}
 
       {matchedDetails ? <SensitiveDetailsCard details={matchedDetails} /> : null}
+
+      {existingMatch && isQrEligibleMatchStatus(existingMatch.status) ? (
+        <PrimaryButton
+          title="View donation QR"
+          onPress={() =>
+            navigation.navigate('DonationQr', {
+              matchId: existingMatch.id,
+            })
+          }
+        />
+      ) : null}
 
       {showRespondButton ? (
         <PrimaryButton

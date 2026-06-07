@@ -18,6 +18,8 @@ export type AppStackParamList = {
   AppProfile: undefined;
   DonorRequestFeed: undefined;
   DonorRequestDetail: { requestId: string };
+  MyDonations: undefined;
+  DonationQr: { matchId: string; donationId?: string };
   MyBloodRequests: undefined;
   CreateBloodRequest: undefined;
   BloodRequestDetail: { requestId: string };

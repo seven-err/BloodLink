@@ -224,6 +224,7 @@ export type Database = {
           completed_at: string | null;
           units_donated: number | null;
           notes: string | null;
+          verification_token: string;
           created_at: string;
           updated_at: string;
         };
@@ -237,6 +238,7 @@ export type Database = {
           completed_at?: string | null;
           units_donated?: number | null;
           notes?: string | null;
+          verification_token?: string;
         };
         Update: Partial<Database['public']['Tables']['donations']['Insert']>;
         Relationships: [];
@@ -476,6 +478,19 @@ export type Database = {
           raw_role: string;
         };
         Returns: UserRole;
+      };
+      ensure_donation_for_accepted_match: {
+        Args: {
+          p_match_id: string;
+        };
+        Returns: Database['public']['Tables']['donations']['Row'];
+      };
+      verify_donation_qr: {
+        Args: {
+          p_donation_id: string;
+          p_token: string;
+        };
+        Returns: Json;
       };
     };
     Enums: {

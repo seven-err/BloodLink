@@ -5,8 +5,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { useAuth } from '@/context/AuthContext';
 import type { AppStackParamList } from '@/navigation/types';
+import { DonationQrScreen } from '@/screens/donor/DonationQrScreen';
 import { DonorRequestDetailScreen } from '@/screens/donor/DonorRequestDetailScreen';
 import { DonorRequestFeedScreen } from '@/screens/donor/DonorRequestFeedScreen';
+import { MyDonationsScreen } from '@/screens/donor/MyDonationsScreen';
 import { BloodRequestDetailScreen } from '@/screens/recipient/BloodRequestDetailScreen';
 import { CreateBloodRequestScreen } from '@/screens/recipient/CreateBloodRequestScreen';
 import { MyBloodRequestsScreen } from '@/screens/recipient/MyBloodRequestsScreen';
@@ -28,6 +30,7 @@ const homeContent = {
     sections: [
       { key: 'availability', label: 'Availability', route: null },
       { key: 'nearby', label: 'Nearby requests', route: 'DonorRequestFeed' as const },
+      { key: 'donations', label: 'My donations', route: 'MyDonations' as const },
       { key: 'reminders', label: 'Donation reminders', route: null },
     ],
     subtitle: 'Track availability, nearby requests, matches, and donation reminders here.',
@@ -177,6 +180,16 @@ export function AppNavigator() {
         component={DonorRequestDetailScreen}
         name="DonorRequestDetail"
         options={{ title: 'Request Preview' }}
+      />
+      <Stack.Screen
+        component={MyDonationsScreen}
+        name="MyDonations"
+        options={{ title: 'My Donations' }}
+      />
+      <Stack.Screen
+        component={DonationQrScreen}
+        name="DonationQr"
+        options={{ title: 'Donation QR' }}
       />
       <Stack.Screen
         component={MyBloodRequestsScreen}
