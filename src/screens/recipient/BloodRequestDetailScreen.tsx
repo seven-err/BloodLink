@@ -6,6 +6,7 @@ import type {
 } from '@react-navigation/native-stack';
 import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
 
+import { RequestLocationMapPreview } from '@/components/map/RequestLocationMapPreview';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { URGENCY_LABELS } from '@/constants/bloodRequestUrgency';
 import type { AppStackParamList } from '@/navigation/types';
@@ -18,6 +19,7 @@ import {
   listMatchesForRequest,
   type RecipientDonorMatchResponse,
 } from '@/services/supabase/donorMatches';
+import { formatDistance, formatTravelTime } from '@/utils/travelMetrics';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'BloodRequestDetail'>;
 
@@ -29,27 +31,6 @@ const formatDateTime = (value: string | null) => {
   }
 
   return new Date(value).toLocaleString();
-};
-
-const formatDistance = (meters: number | null) => {
-  if (meters == null) {
-    return 'Distance unavailable';
-  }
-
-  if (meters < 1000) {
-    return `~${Math.round(meters)} m away`;
-  }
-
-  return `~${(meters / 1000).toFixed(1)} km away`;
-};
-
-const formatTravelTime = (seconds: number | null) => {
-  if (seconds == null) {
-    return null;
-  }
-
-  const minutes = Math.max(1, Math.round(seconds / 60));
-  return `~${minutes} min travel time`;
 };
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -415,6 +396,13 @@ export function BloodRequestDetailScreen({ navigation, route }: Props) {
         onAccept={(match) => void handleMatchAction(match, 'accept')}
         onDecline={(match) => void handleMatchAction(match, 'decline')}
         onRetry={() => void loadMatches()}
+      />
+
+      <RequestLocationMapPreview
+        latitude={request.latitude}
+        longitude={request.longitude}
+        subtitle="This preview uses the coordinates saved with your request."
+        title="Request location preview"
       />
 
       <View style={recipientStyles.card}>

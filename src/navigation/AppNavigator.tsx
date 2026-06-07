@@ -6,6 +6,7 @@ import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { useAuth } from '@/context/AuthContext';
 import type { AppStackParamList } from '@/navigation/types';
 import { DonationQrScreen } from '@/screens/donor/DonationQrScreen';
+import { DonorOpenRequestsMapScreen } from '@/screens/donor/DonorOpenRequestsMapScreen';
 import { DonorRequestDetailScreen } from '@/screens/donor/DonorRequestDetailScreen';
 import { DonorRequestFeedScreen } from '@/screens/donor/DonorRequestFeedScreen';
 import { MyDonationsScreen } from '@/screens/donor/MyDonationsScreen';
@@ -176,7 +177,32 @@ export function AppNavigator() {
       <Stack.Screen
         component={DonorRequestFeedScreen}
         name="DonorRequestFeed"
-        options={{ title: 'Open Blood Requests' }}
+        options={({ navigation }) => ({
+          title: 'Open Blood Requests',
+          headerRight: () => (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => navigation.navigate('DonorOpenRequestsMap')}
+            >
+              <Text style={{ color: '#991b1b', fontWeight: '700' }}>Map</Text>
+            </Pressable>
+          ),
+        })}
+      />
+      <Stack.Screen
+        component={DonorOpenRequestsMapScreen}
+        name="DonorOpenRequestsMap"
+        options={({ navigation }) => ({
+          title: 'Requests Map',
+          headerRight: () => (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => navigation.navigate('DonorRequestFeed')}
+            >
+              <Text style={{ color: '#991b1b', fontWeight: '700' }}>List</Text>
+            </Pressable>
+          ),
+        })}
       />
       <Stack.Screen
         component={DonorRequestDetailScreen}

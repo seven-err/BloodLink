@@ -17,6 +17,7 @@ export type AppStackParamList = {
   RecipientHome: undefined;
   AppProfile: undefined;
   DonorRequestFeed: undefined;
+  DonorOpenRequestsMap: undefined;
   DonorRequestDetail: { requestId: string };
   MyDonations: undefined;
   DonationQr: { matchId: string; donationId?: string };

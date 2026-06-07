@@ -12,6 +12,7 @@ import {
 
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { URGENCY_LABELS } from '@/constants/bloodRequestUrgency';
+import { formatApproximateCoordinates } from '@/utils/coordinates';
 import type { AppStackParamList } from '@/navigation/types';
 import { authStyles } from '@/screens/auth/styles';
 import { recipientStyles } from '@/screens/recipient/styles';
@@ -28,17 +29,6 @@ const formatDateTime = (value: string | null) => {
   }
 
   return new Date(value).toLocaleString();
-};
-
-const formatApproximateLocation = (
-  latitude: number | null,
-  longitude: number | null,
-) => {
-  if (latitude === null || longitude === null) {
-    return 'Location not shared';
-  }
-
-  return `Approx. ${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
 };
 
 function FeedListItem({
@@ -63,7 +53,7 @@ function FeedListItem({
         Needed by: {formatDateTime(request.needed_at)}
       </Text>
       <Text style={recipientStyles.meta}>
-        {formatApproximateLocation(request.latitude, request.longitude)}
+        {formatApproximateCoordinates(request.latitude, request.longitude)}
       </Text>
     </Pressable>
   );
@@ -145,6 +135,11 @@ export function DonorRequestFeedScreen({ navigation }: Props) {
             Browse open requests you may be able to help with. Contact details are shared
             only after you are matched.
           </Text>
+          <PrimaryButton
+            title="View on map"
+            variant="secondary"
+            onPress={() => navigation.navigate('DonorOpenRequestsMap')}
+          />
         </View>
 
         {error ? <Text style={authStyles.error}>{error}</Text> : null}

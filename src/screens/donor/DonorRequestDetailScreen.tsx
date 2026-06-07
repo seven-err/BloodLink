@@ -3,6 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 
+import { RequestLocationMapPreview } from '@/components/map/RequestLocationMapPreview';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { URGENCY_LABELS } from '@/constants/bloodRequestUrgency';
 import { useAuth } from '@/context/AuthContext';
@@ -22,6 +23,7 @@ import {
   getOpenBloodRequestById,
   type OpenBloodRequestFeedItem,
 } from '@/services/supabase/openBloodRequestsFeed';
+import { formatApproximateCoordinates } from '@/utils/coordinates';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'DonorRequestDetail'>;
 
@@ -33,17 +35,6 @@ const formatDateTime = (value: string | null) => {
   }
 
   return new Date(value).toLocaleString();
-};
-
-const formatApproximateLocation = (
-  latitude: number | null,
-  longitude: number | null,
-) => {
-  if (latitude === null || longitude === null) {
-    return 'Location not shared';
-  }
-
-  return `Approx. ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
 };
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -303,11 +294,18 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
         <DetailRow label="Needed by" value={formatDateTime(request.needed_at)} />
         <DetailRow
           label="Approximate location"
-          value={formatApproximateLocation(request.latitude, request.longitude)}
+          value={formatApproximateCoordinates(request.latitude, request.longitude)}
         />
         <DetailRow label="Posted" value={formatDateTime(request.created_at)} />
         <DetailRow label="Last updated" value={formatDateTime(request.updated_at)} />
       </View>
+
+      <RequestLocationMapPreview
+        approximate
+        latitude={request.latitude}
+        longitude={request.longitude}
+        title="Approximate request area"
+      />
 
       {showStatusCard ? (
         <ResponseStatusCard
