@@ -55,7 +55,6 @@ export const completeProfile = ({
       address: address.trim(),
       latitude: latitude ?? null,
       longitude: longitude ?? null,
-      is_available: role === 'donor',
     }, {
       onConflict: 'id',
     })
