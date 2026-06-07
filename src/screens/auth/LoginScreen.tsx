@@ -16,6 +16,7 @@ import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { FormTextInput } from '@/components/forms/FormTextInput';
 import type { AuthStackParamList } from '@/navigation/types';
 import { signInWithEmail } from '@/services/supabase/auth';
+import { loginPasswordSchema } from '@/utils/password';
 import { AuthBrand } from './AuthBrand';
 import { AuthDivider } from './AuthDivider';
 import { AuthIcon, MutedIcon } from './icons';
@@ -28,7 +29,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 const schema = z.object({
   email: z.string().email('Enter a valid email address.'),
-  password: z.string().min(6, 'Password must be at least 6 characters.'),
+  password: loginPasswordSchema,
 });
 
 type FormValues = z.infer<typeof schema>;

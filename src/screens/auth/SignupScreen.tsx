@@ -17,6 +17,7 @@ import { FormTextInput } from '@/components/forms/FormTextInput';
 import type { AuthStackParamList } from '@/navigation/types';
 import { signUpWithEmail } from '@/services/supabase/auth';
 import { normalizePhoneNumber } from '@/utils/phone';
+import { PASSWORD_RULES, signupPasswordSchema } from '@/utils/password';
 import { AuthBrand } from './AuthBrand';
 import { AuthIcon, MutedIcon } from './icons';
 import { AuthTabs } from './AuthTabs';
@@ -30,12 +31,7 @@ const schema = z
     confirmPassword: z.string(),
     email: z.string().email('Enter a valid email address.'),
     fullName: z.string().min(2, 'Full name is required.'),
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters.')
-      .regex(/\d/, 'Password must include at least 1 number.')
-      .regex(/[a-z]/, 'Password must include lowercase letters.')
-      .regex(/[A-Z]/, 'Password must include uppercase letters.'),
+    password: signupPasswordSchema,
     phone: z.string().min(10, 'Enter a valid mobile number.'),
   })
   .refine((value) => value.password === value.confirmPassword, {
@@ -195,9 +191,11 @@ export function SignupScreen({ navigation }: Props) {
             )}
           />
           <View style={styles.rules}>
-            <Text style={styles.rule}>✓ At least 8 characters</Text>
-            <Text style={styles.rule}>✓ At least 1 number</Text>
-            <Text style={styles.rule}>✓ Both upper and lower case letters</Text>
+            {PASSWORD_RULES.hints.map((hint) => (
+              <Text key={hint} style={styles.rule}>
+                ✓ {hint}
+              </Text>
+            ))}
           </View>
           {error ? <Text style={authStyles.error}>{error}</Text> : null}
           <PrimaryButton loading={loading} title="Sign Up" onPress={handleSubmit(onSubmit)} />
