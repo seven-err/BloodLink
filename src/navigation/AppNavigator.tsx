@@ -10,13 +10,15 @@ import { DonorOpenRequestsMapScreen } from '@/screens/donor/DonorOpenRequestsMap
 import { DonorRequestDetailScreen } from '@/screens/donor/DonorRequestDetailScreen';
 import { DonorRequestFeedScreen } from '@/screens/donor/DonorRequestFeedScreen';
 import { MyDonationsScreen } from '@/screens/donor/MyDonationsScreen';
+import { EditProfileScreen } from '@/screens/profile/EditProfileScreen';
+import { SettingsScreen } from '@/screens/profile/SettingsScreen';
+import { UserProfileScreen } from '@/screens/profile/UserProfileScreen';
 import { BloodRequestDetailScreen } from '@/screens/recipient/BloodRequestDetailScreen';
 import { CreateBloodRequestScreen } from '@/screens/recipient/CreateBloodRequestScreen';
 import { MyBloodRequestsScreen } from '@/screens/recipient/MyBloodRequestsScreen';
 import { ChatThreadScreen } from '@/screens/ChatThreadScreen';
 import { NotificationsScreen } from '@/screens/NotificationsScreen';
 import { RestrictedAccessScreen } from '@/screens/RestrictedAccessScreen';
-import { signOut } from '@/services/supabase/auth';
 import { isMobileAppRole } from '@/utils/roles';
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -31,7 +33,7 @@ const homeContent = {
     actionTitle: 'View donor profile',
     eyebrow: 'Donor dashboard',
     sections: [
-      { key: 'availability', label: 'Availability', route: null },
+      { key: 'availability', label: 'Availability', route: 'AppProfile' as const },
       { key: 'nearby', label: 'Nearby requests', route: 'DonorRequestFeed' as const },
       { key: 'donations', label: 'My donations', route: 'MyDonations' as const },
       { key: 'notifications', label: 'Notifications', route: 'Notifications' as const },
@@ -114,25 +116,12 @@ function RoleHomeScreen({ navigation, route }: HomeProps) {
           title={content.actionTitle}
           onPress={() => navigation.navigate('AppProfile')}
         />
-        <PrimaryButton title="Sign out" variant="secondary" onPress={signOut} />
+        <PrimaryButton
+          title="Settings"
+          variant="secondary"
+          onPress={() => navigation.navigate('Settings')}
+        />
       </View>
-    </View>
-  );
-}
-
-function AppProfileScreen() {
-  const { profile } = useAuth();
-
-  return (
-    <View style={styles.screen}>
-      <View style={styles.card}>
-        <Text style={styles.eyebrow}>Profile</Text>
-        <Text style={styles.title}>{profile?.full_name ?? 'BloodLink user'}</Text>
-        <Text style={styles.detail}>Role: {profile?.role ?? 'Unknown'}</Text>
-        <Text style={styles.detail}>Blood type: {profile?.blood_type ?? 'Not set'}</Text>
-        <Text style={styles.detail}>Address: {profile?.address ?? 'Not set'}</Text>
-      </View>
-      <PrimaryButton title="Sign out" variant="secondary" onPress={signOut} />
     </View>
   );
 }
@@ -170,9 +159,19 @@ export function AppNavigator() {
         options={{ headerBackVisible: false, title: 'Recipient Home' }}
       />
       <Stack.Screen
-        component={AppProfileScreen}
+        component={UserProfileScreen}
         name="AppProfile"
         options={{ title: 'Profile' }}
+      />
+      <Stack.Screen
+        component={EditProfileScreen}
+        name="EditProfile"
+        options={{ title: 'Edit Profile' }}
+      />
+      <Stack.Screen
+        component={SettingsScreen}
+        name="Settings"
+        options={{ title: 'Settings' }}
       />
       <Stack.Screen
         component={DonorRequestFeedScreen}
@@ -259,10 +258,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     gap: 10,
     padding: 24,
-  },
-  detail: {
-    color: '#4b5563',
-    fontSize: 16,
   },
   eyebrow: {
     color: '#b91c1c',
