@@ -23,5 +23,11 @@ export type AppStackParamList = {
   MyBloodRequests: undefined;
   CreateBloodRequest: undefined;
   BloodRequestDetail: { requestId: string };
+  ChatThread: {
+    bloodRequestId: string;
+    donorMatchId: string;
+    recipientId: string;
+    recipientDisplayName?: string;
+  };
   Notifications: undefined;
 };

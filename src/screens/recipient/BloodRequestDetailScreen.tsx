@@ -1,6 +1,9 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type {
+  NativeStackNavigationProp,
+  NativeStackScreenProps,
+} from '@react-navigation/native-stack';
 import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
 
 import { PrimaryButton } from '@/components/common/PrimaryButton';
@@ -59,17 +62,21 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 }
 
 function DonorResponseCard({
+  bloodRequestId,
   match,
   actionMatchId,
   actionState,
   actionError,
+  navigation,
   onAccept,
   onDecline,
 }: {
+  bloodRequestId: string;
   match: RecipientDonorMatchResponse;
   actionMatchId: string | null;
   actionState: MatchActionState;
   actionError: string | null;
+  navigation: NativeStackNavigationProp<AppStackParamList, 'BloodRequestDetail'>;
   onAccept: (match: RecipientDonorMatchResponse) => void;
   onDecline: (match: RecipientDonorMatchResponse) => void;
 }) {
@@ -115,6 +122,20 @@ function DonorResponseCard({
         </View>
       ) : null}
 
+      {match.status === 'accepted' || match.status === 'completed' ? (
+        <PrimaryButton
+          title="Message donor"
+          onPress={() =>
+            navigation.navigate('ChatThread', {
+              bloodRequestId,
+              donorMatchId: match.id,
+              recipientDisplayName: donorLabel,
+              recipientId: match.donor_id,
+            })
+          }
+        />
+      ) : null}
+
       {actionMatchId === match.id && actionState === 'error' && actionError ? (
         <Text style={authStyles.error}>{actionError}</Text>
       ) : null}
@@ -123,6 +144,7 @@ function DonorResponseCard({
 }
 
 function DonorResponsesSection({
+  bloodRequestId,
   matches,
   matchesLoading,
   matchesError,
@@ -130,10 +152,12 @@ function DonorResponsesSection({
   actionState,
   actionError,
   actionSuccessMessage,
+  navigation,
   onAccept,
   onDecline,
   onRetry,
 }: {
+  bloodRequestId: string;
   matches: RecipientDonorMatchResponse[];
   matchesLoading: boolean;
   matchesError: string | null;
@@ -141,6 +165,7 @@ function DonorResponsesSection({
   actionState: MatchActionState;
   actionError: string | null;
   actionSuccessMessage: string | null;
+  navigation: NativeStackNavigationProp<AppStackParamList, 'BloodRequestDetail'>;
   onAccept: (match: RecipientDonorMatchResponse) => void;
   onDecline: (match: RecipientDonorMatchResponse) => void;
   onRetry: () => void;
@@ -194,7 +219,9 @@ function DonorResponsesSection({
             actionError={actionError}
             actionMatchId={actionMatchId}
             actionState={actionState}
+            bloodRequestId={bloodRequestId}
             match={match}
+            navigation={navigation}
             onAccept={onAccept}
             onDecline={onDecline}
           />
@@ -380,9 +407,11 @@ export function BloodRequestDetailScreen({ navigation, route }: Props) {
         actionMatchId={actionMatchId}
         actionState={actionState}
         actionSuccessMessage={actionSuccessMessage}
+        bloodRequestId={requestId}
         matches={matches}
         matchesError={matchesError}
         matchesLoading={matchesLoading}
+        navigation={navigation}
         onAccept={(match) => void handleMatchAction(match, 'accept')}
         onDecline={(match) => void handleMatchAction(match, 'decline')}
         onRetry={() => void loadMatches()}

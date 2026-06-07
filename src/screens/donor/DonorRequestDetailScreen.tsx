@@ -321,14 +321,29 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
       {matchedDetails ? <SensitiveDetailsCard details={matchedDetails} /> : null}
 
       {existingMatch && isQrEligibleMatchStatus(existingMatch.status) ? (
-        <PrimaryButton
-          title="View donation QR"
-          onPress={() =>
-            navigation.navigate('DonationQr', {
-              matchId: existingMatch.id,
-            })
-          }
-        />
+        <>
+          <PrimaryButton
+            title="Message requester"
+            onPress={() =>
+              navigation.navigate('ChatThread', {
+                bloodRequestId: requestId,
+                donorMatchId: existingMatch.id,
+                recipientDisplayName: 'Request contact',
+                recipientId: matchedDetails?.requester_id ?? '',
+              })
+            }
+            disabled={!matchedDetails?.requester_id}
+          />
+          <PrimaryButton
+            title="View donation QR"
+            variant="secondary"
+            onPress={() =>
+              navigation.navigate('DonationQr', {
+                matchId: existingMatch.id,
+              })
+            }
+          />
+        </>
       ) : null}
 
       {showRespondButton ? (

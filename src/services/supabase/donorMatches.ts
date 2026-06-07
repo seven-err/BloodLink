@@ -8,6 +8,7 @@ export type DonorMatch = Database['public']['Tables']['donor_matches']['Row'];
 export type MatchedBloodRequestDetails = Pick<
   Database['public']['Tables']['blood_requests']['Row'],
   | 'id'
+  | 'requester_id'
   | 'blood_type'
   | 'units_needed'
   | 'status'
@@ -27,7 +28,7 @@ export type MatchedBloodRequestDetails = Pick<
 const DUPLICATE_MATCH_ERROR_CODE = '23505';
 
 const MATCHED_BLOOD_REQUEST_COLUMNS =
-  'id,blood_type,units_needed,status,urgency,patient_name,hospital_name,contact_phone,notes,needed_at,address,latitude,longitude,created_at,updated_at' as const;
+  'id,requester_id,blood_type,units_needed,status,urgency,patient_name,hospital_name,contact_phone,notes,needed_at,address,latitude,longitude,created_at,updated_at' as const;
 
 export type RespondToBloodRequestOptions = {
   donorLatitude?: number | null;

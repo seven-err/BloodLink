@@ -92,5 +92,51 @@ export const subscribeToOpenBloodRequests = (
   };
 };
 
+export type MessageConversationSubscriptionContext = {
+  bloodRequestId: string;
+  donorMatchId: string;
+};
+
+export type MessagesSubscription = {
+  stop: () => void;
+};
+
+const DEFAULT_MESSAGES_POLL_INTERVAL_MS = 30_000;
+
+/**
+ * Subscribes to message changes for a blood-request conversation.
+ * Realtime respects RLS; polling refetches as a safe fallback.
+ */
+export const subscribeToMessages = (
+  context: MessageConversationSubscriptionContext,
+  onChange: SubscriptionHandler<unknown>,
+  options?: { intervalMs?: number; onError?: SubscriptionHandler<Error> },
+): MessagesSubscription => {
+  const intervalMs = options?.intervalMs ?? DEFAULT_MESSAGES_POLL_INTERVAL_MS;
+
+  const channel = supabase
+    .channel(`messages:request:${context.bloodRequestId}:match:${context.donorMatchId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'messages',
+        filter: `blood_request_id=eq.${context.bloodRequestId}`,
+      },
+      onChange,
+    )
+    .subscribe();
+
+  const timer = setInterval(onChange, intervalMs);
+
+  return {
+    stop: () => {
+      clearInterval(timer);
+      supabase.removeChannel(channel);
+    },
+  };
+};
+
 export const unsubscribe = (channel: RealtimeChannel) =>
   supabase.removeChannel(channel);

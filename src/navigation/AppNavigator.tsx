@@ -12,6 +12,7 @@ import { MyDonationsScreen } from '@/screens/donor/MyDonationsScreen';
 import { BloodRequestDetailScreen } from '@/screens/recipient/BloodRequestDetailScreen';
 import { CreateBloodRequestScreen } from '@/screens/recipient/CreateBloodRequestScreen';
 import { MyBloodRequestsScreen } from '@/screens/recipient/MyBloodRequestsScreen';
+import { ChatThreadScreen } from '@/screens/ChatThreadScreen';
 import { NotificationsScreen } from '@/screens/NotificationsScreen';
 import { RestrictedAccessScreen } from '@/screens/RestrictedAccessScreen';
 import { signOut } from '@/services/supabase/auth';
@@ -206,6 +207,13 @@ export function AppNavigator() {
         component={BloodRequestDetailScreen}
         name="BloodRequestDetail"
         options={{ title: 'Request Details' }}
+      />
+      <Stack.Screen
+        component={ChatThreadScreen}
+        name="ChatThread"
+        options={({ route }) => ({
+          title: route.params.recipientDisplayName?.trim() || 'Chat',
+        })}
       />
       <Stack.Screen
         component={NotificationsScreen}
