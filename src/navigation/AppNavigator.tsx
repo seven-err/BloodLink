@@ -1,10 +1,13 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { useAuth } from '@/context/AuthContext';
 import type { AppStackParamList } from '@/navigation/types';
+import { BloodRequestDetailScreen } from '@/screens/recipient/BloodRequestDetailScreen';
+import { CreateBloodRequestScreen } from '@/screens/recipient/CreateBloodRequestScreen';
+import { MyBloodRequestsScreen } from '@/screens/recipient/MyBloodRequestsScreen';
 import { RestrictedAccessScreen } from '@/screens/RestrictedAccessScreen';
 import { signOut } from '@/services/supabase/auth';
 import { isMobileAppRole } from '@/utils/roles';
@@ -20,13 +23,21 @@ const homeContent = {
   DonorHome: {
     actionTitle: 'View donor profile',
     eyebrow: 'Donor dashboard',
-    sections: ['Availability', 'Nearby requests', 'Donation reminders'],
+    sections: [
+      { key: 'availability', label: 'Availability', route: null },
+      { key: 'nearby', label: 'Nearby requests', route: null },
+      { key: 'reminders', label: 'Donation reminders', route: null },
+    ],
     subtitle: 'Track availability, nearby requests, matches, and donation reminders here.',
   },
   RecipientHome: {
     actionTitle: 'View recipient profile',
     eyebrow: 'Recipient dashboard',
-    sections: ['Blood requests', 'Donor matches', 'Request updates'],
+    sections: [
+      { key: 'requests', label: 'Blood requests', route: 'MyBloodRequests' as const },
+      { key: 'matches', label: 'Donor matches', route: null },
+      { key: 'updates', label: 'Request updates', route: null },
+    ],
     subtitle: 'Create requests, follow donor matches, and receive request updates here.',
   },
 } satisfies Record<
@@ -34,7 +45,11 @@ const homeContent = {
   {
     actionTitle: string;
     eyebrow: string;
-    sections: string[];
+    sections: Array<{
+      key: string;
+      label: string;
+      route: keyof AppStackParamList | null;
+    }>;
     subtitle: string;
   }
 >;
@@ -54,14 +69,39 @@ function RoleHomeScreen({ navigation, route }: HomeProps) {
       </View>
 
       <View style={styles.sectionGrid}>
-        {content.sections.map((section) => (
-          <View key={section} style={styles.sectionCard}>
-            <Text style={styles.sectionText}>{section}</Text>
-          </View>
-        ))}
+        {content.sections.map((section) => {
+          const card = (
+            <View
+              key={section.key}
+              style={[styles.sectionCard, section.route ? styles.sectionCardInteractive : null]}
+            >
+              <Text style={styles.sectionText}>{section.label}</Text>
+            </View>
+          );
+
+          if (!section.route) {
+            return card;
+          }
+
+          return (
+            <Pressable
+              key={section.key}
+              style={styles.sectionPressable}
+              onPress={() => navigation.navigate(section.route!)}
+            >
+              {card}
+            </Pressable>
+          );
+        })}
       </View>
 
       <View style={styles.actions}>
+        {route.name === 'RecipientHome' ? (
+          <PrimaryButton
+            title="Create blood request"
+            onPress={() => navigation.navigate('CreateBloodRequest')}
+          />
+        ) : null}
         <PrimaryButton
           title={content.actionTitle}
           onPress={() => navigation.navigate('AppProfile')}
@@ -126,6 +166,21 @@ export function AppNavigator() {
         name="AppProfile"
         options={{ title: 'Profile' }}
       />
+      <Stack.Screen
+        component={MyBloodRequestsScreen}
+        name="MyBloodRequests"
+        options={{ title: 'My Blood Requests' }}
+      />
+      <Stack.Screen
+        component={CreateBloodRequestScreen}
+        name="CreateBloodRequest"
+        options={{ title: 'Create Request' }}
+      />
+      <Stack.Screen
+        component={BloodRequestDetailScreen}
+        name="BloodRequestDetail"
+        options={{ title: 'Request Details' }}
+      />
     </Stack.Navigator>
   );
 }
@@ -166,10 +221,17 @@ const styles = StyleSheet.create({
     minWidth: 120,
     padding: 14,
   },
+  sectionCardInteractive: {
+    backgroundColor: '#fff',
+  },
   sectionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+  },
+  sectionPressable: {
+    flex: 1,
+    minWidth: 120,
   },
   sectionText: {
     color: '#7f1d1d',
