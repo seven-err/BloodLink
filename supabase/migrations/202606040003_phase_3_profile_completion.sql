@@ -1,4 +1,4 @@
-﻿-- BloodLink Phase 3 profile completion support
+-- BloodLink Phase 3 profile completion support
 
 alter table public.profiles
 add column if not exists birthdate date;

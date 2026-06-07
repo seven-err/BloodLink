@@ -1,4 +1,4 @@
-﻿-- BloodLink Task 2.1-2.3 phase 2 schema
+-- BloodLink Task 2.1-2.3 phase 2 schema
 
 create type public.message_status as enum ('sent', 'read', 'archived');
 create type public.availability_status as enum ('available', 'unavailable', 'scheduled');

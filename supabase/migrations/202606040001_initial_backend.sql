@@ -1,4 +1,4 @@
-﻿-- BloodLink Task 1.2 initial Supabase backend
+-- BloodLink Task 1.2 initial Supabase backend
 
 create extension if not exists postgis with schema extensions;
 create extension if not exists pgcrypto with schema extensions;
