@@ -12,6 +12,7 @@ import { MyDonationsScreen } from '@/screens/donor/MyDonationsScreen';
 import { BloodRequestDetailScreen } from '@/screens/recipient/BloodRequestDetailScreen';
 import { CreateBloodRequestScreen } from '@/screens/recipient/CreateBloodRequestScreen';
 import { MyBloodRequestsScreen } from '@/screens/recipient/MyBloodRequestsScreen';
+import { NotificationsScreen } from '@/screens/NotificationsScreen';
 import { RestrictedAccessScreen } from '@/screens/RestrictedAccessScreen';
 import { signOut } from '@/services/supabase/auth';
 import { isMobileAppRole } from '@/utils/roles';
@@ -31,7 +32,7 @@ const homeContent = {
       { key: 'availability', label: 'Availability', route: null },
       { key: 'nearby', label: 'Nearby requests', route: 'DonorRequestFeed' as const },
       { key: 'donations', label: 'My donations', route: 'MyDonations' as const },
-      { key: 'reminders', label: 'Donation reminders', route: null },
+      { key: 'notifications', label: 'Notifications', route: 'Notifications' as const },
     ],
     subtitle: 'Track availability, nearby requests, matches, and donation reminders here.',
   },
@@ -41,7 +42,7 @@ const homeContent = {
     sections: [
       { key: 'requests', label: 'Blood requests', route: 'MyBloodRequests' as const },
       { key: 'matches', label: 'Donor matches', route: null },
-      { key: 'updates', label: 'Request updates', route: null },
+      { key: 'notifications', label: 'Notifications', route: 'Notifications' as const },
     ],
     subtitle: 'Create requests, follow donor matches, and receive request updates here.',
   },
@@ -205,6 +206,11 @@ export function AppNavigator() {
         component={BloodRequestDetailScreen}
         name="BloodRequestDetail"
         options={{ title: 'Request Details' }}
+      />
+      <Stack.Screen
+        component={NotificationsScreen}
+        name="Notifications"
+        options={{ title: 'Notifications' }}
       />
     </Stack.Navigator>
   );

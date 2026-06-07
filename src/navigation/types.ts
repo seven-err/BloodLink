@@ -23,4 +23,5 @@ export type AppStackParamList = {
   MyBloodRequests: undefined;
   CreateBloodRequest: undefined;
   BloodRequestDetail: { requestId: string };
+  Notifications: undefined;
 };
