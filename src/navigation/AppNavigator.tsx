@@ -45,7 +45,7 @@ const homeContent = {
     eyebrow: 'Recipient dashboard',
     sections: [
       { key: 'requests', label: 'Blood requests', route: 'MyBloodRequests' as const },
-      { key: 'matches', label: 'Donor matches', route: null },
+      { key: 'matches', label: 'Donor matches', route: 'MyBloodRequests' as const },
       { key: 'notifications', label: 'Notifications', route: 'Notifications' as const },
     ],
     subtitle: 'Create requests, follow donor matches, and receive request updates here.',

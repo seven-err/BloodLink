@@ -3,6 +3,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
+  Alert,
   KeyboardAvoidingView,
   Pressable,
   ScrollView,
@@ -129,7 +130,14 @@ export function LoginScreen({ navigation }: Props) {
               />
             )}
           />
-          <Pressable>
+          <Pressable
+            onPress={() =>
+              Alert.alert(
+                'Password reset',
+                'Use phone OTP login for this demo, or contact support to reset your password.',
+              )
+            }
+          >
             <Text style={styles.forgot}>Forgot Password?</Text>
           </Pressable>
           {error ? <Text style={authStyles.error}>{error}</Text> : null}

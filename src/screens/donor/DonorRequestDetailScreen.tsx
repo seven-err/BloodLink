@@ -37,6 +37,31 @@ const formatDateTime = (value: string | null) => {
   return new Date(value).toLocaleString();
 };
 
+const toFeedPreview = (
+  details: Pick<
+    MatchedBloodRequestDetails,
+    | 'id'
+    | 'blood_type'
+    | 'units_needed'
+    | 'urgency'
+    | 'needed_at'
+    | 'latitude'
+    | 'longitude'
+    | 'created_at'
+    | 'updated_at'
+  >,
+): OpenBloodRequestFeedItem => ({
+  id: details.id,
+  blood_type: details.blood_type,
+  units_needed: details.units_needed,
+  urgency: details.urgency,
+  needed_at: details.needed_at,
+  latitude: details.latitude,
+  longitude: details.longitude,
+  created_at: details.created_at,
+  updated_at: details.updated_at,
+});
+
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ gap: 4 }}>
@@ -180,7 +205,8 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
       return;
     }
 
-    setRequest(feedItem);
+    let nextRequest: OpenBloodRequestFeedItem | null = feedItem;
+    let nextMatchedDetails: MatchedBloodRequestDetails | null = null;
 
     if (donorMatch && canShowSensitiveRequestDetails(donorMatch)) {
       const { data: authorizedDetails, error: detailsError } =
@@ -188,13 +214,16 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
 
       if (detailsError) {
         setMatchedDetails(null);
-      } else {
-        setMatchedDetails(authorizedDetails);
+      } else if (authorizedDetails) {
+        nextMatchedDetails = authorizedDetails;
+        if (!nextRequest) {
+          nextRequest = toFeedPreview(authorizedDetails);
+        }
       }
-    } else {
-      setMatchedDetails(null);
     }
 
+    setRequest(nextRequest);
+    setMatchedDetails(nextMatchedDetails);
     setLoading(false);
   }, [donorId, requestId]);
 
@@ -254,10 +283,10 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
     );
   }
 
-  if (error || !request) {
+  if (error) {
     return (
       <View style={recipientStyles.centerContent}>
-        <Text style={authStyles.error}>{error ?? 'Blood request not found.'}</Text>
+        <Text style={authStyles.error}>{error}</Text>
         <PrimaryButton title="Try again" onPress={() => void loadRequest()} />
         <PrimaryButton
           title="Back to open requests"
@@ -266,6 +295,85 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
         />
       </View>
     );
+  }
+
+  if (!request && !existingMatch) {
+    return (
+      <View style={recipientStyles.centerContent}>
+        <Text style={authStyles.error}>Blood request not found.</Text>
+        <PrimaryButton title="Try again" onPress={() => void loadRequest()} />
+        <PrimaryButton
+          title="Back to open requests"
+          variant="secondary"
+          onPress={() => navigation.navigate('DonorRequestFeed')}
+        />
+      </View>
+    );
+  }
+
+  if (!request && existingMatch) {
+    return (
+      <ScrollView
+        contentContainerStyle={recipientStyles.scrollContent}
+        style={recipientStyles.screen}
+      >
+        <View style={recipientStyles.card}>
+          <Text style={recipientStyles.eyebrow}>Request closed</Text>
+          <Text style={recipientStyles.title}>This request is no longer open</Text>
+          <Text style={recipientStyles.subtitle}>
+            Your response remains on file with status &quot;{existingMatch.status}&quot;. Patient
+            and hospital details stay hidden until your match is accepted.
+          </Text>
+        </View>
+
+        {showStatusCard ? (
+          <ResponseStatusCard
+            hasExistingMatch={hasResponded}
+            match={existingMatch}
+            responseError={responseError}
+            responseState={responseState}
+          />
+        ) : null}
+
+        {matchedDetails ? <SensitiveDetailsCard details={matchedDetails} /> : null}
+
+        {existingMatch && isQrEligibleMatchStatus(existingMatch.status) ? (
+          <>
+            <PrimaryButton
+              title="Message requester"
+              onPress={() =>
+                navigation.navigate('ChatThread', {
+                  bloodRequestId: requestId,
+                  donorMatchId: existingMatch.id,
+                  recipientDisplayName: 'Request contact',
+                  recipientId: matchedDetails?.requester_id ?? '',
+                })
+              }
+              disabled={!matchedDetails?.requester_id}
+            />
+            <PrimaryButton
+              title="View donation QR"
+              variant="secondary"
+              onPress={() =>
+                navigation.navigate('DonationQr', {
+                  matchId: existingMatch.id,
+                })
+              }
+            />
+          </>
+        ) : null}
+
+        <PrimaryButton
+          title="Back to open requests"
+          variant="secondary"
+          onPress={() => navigation.navigate('DonorRequestFeed')}
+        />
+      </ScrollView>
+    );
+  }
+
+  if (!request) {
+    return null;
   }
 
   return (
