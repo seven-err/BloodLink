@@ -16,6 +16,8 @@ export type AppStackParamList = {
   DonorHome: undefined;
   RecipientHome: undefined;
   AppProfile: undefined;
+  DonorRequestFeed: undefined;
+  DonorRequestDetail: { requestId: string };
   MyBloodRequests: undefined;
   CreateBloodRequest: undefined;
   BloodRequestDetail: { requestId: string };

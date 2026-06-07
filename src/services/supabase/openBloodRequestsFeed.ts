@@ -14,3 +14,10 @@ export const getOpenBloodRequestsFeed = () =>
     .from('open_blood_requests_feed')
     .select(OPEN_BLOOD_REQUESTS_FEED_COLUMNS)
     .order('created_at', { ascending: false });
+
+export const getOpenBloodRequestById = (requestId: string) =>
+  supabase
+    .from('open_blood_requests_feed')
+    .select(OPEN_BLOOD_REQUESTS_FEED_COLUMNS)
+    .eq('id', requestId)
+    .maybeSingle();
