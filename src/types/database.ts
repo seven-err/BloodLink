@@ -411,6 +411,22 @@ export type Database = {
         };
         Relationships: [];
       };
+      recipient_donor_match_responses: {
+        Row: {
+          id: string;
+          request_id: string;
+          donor_id: string;
+          status: DonorMatchStatus;
+          distance_meters: number | null;
+          travel_time_seconds: number | null;
+          responded_at: string | null;
+          created_at: string;
+          updated_at: string;
+          donor_name: string;
+          donor_blood_type: BloodType;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       is_admin: {

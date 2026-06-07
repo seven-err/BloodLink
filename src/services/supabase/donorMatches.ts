@@ -144,3 +144,76 @@ export const respondToBloodRequest = async (
 
 export const canShowSensitiveRequestDetails = (match: DonorMatch | null) =>
   match?.status === 'accepted' || match?.status === 'completed';
+
+export type RecipientDonorMatchResponse =
+  Database['public']['Views']['recipient_donor_match_responses']['Row'];
+
+const RECIPIENT_DONOR_MATCH_RESPONSE_COLUMNS =
+  'id,request_id,donor_id,status,distance_meters,travel_time_seconds,responded_at,created_at,updated_at,donor_name,donor_blood_type' as const;
+
+export type DonorMatchActionResult =
+  | { kind: 'success'; match: DonorMatch }
+  | { kind: 'not_found' }
+  | { kind: 'invalid_transition'; message: string }
+  | { kind: 'error'; message: string };
+
+export const listMatchesForRequest = (requestId: string) =>
+  supabase
+    .from('recipient_donor_match_responses')
+    .select(RECIPIENT_DONOR_MATCH_RESPONSE_COLUMNS)
+    .eq('request_id', requestId)
+    .order('responded_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
+
+const updatePendingDonorMatchStatus = async (
+  matchId: string,
+  status: 'accepted' | 'declined',
+): Promise<DonorMatchActionResult> => {
+  const { data: existingMatch, error: fetchError } = await supabase
+    .from('donor_matches')
+    .select('*')
+    .eq('id', matchId)
+    .maybeSingle();
+
+  if (fetchError) {
+    return { kind: 'error', message: fetchError.message };
+  }
+
+  if (!existingMatch) {
+    return { kind: 'not_found' };
+  }
+
+  if (existingMatch.status !== 'pending') {
+    return {
+      kind: 'invalid_transition',
+      message: `This donor response is already ${existingMatch.status}.`,
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('donor_matches')
+    .update({ status })
+    .eq('id', matchId)
+    .eq('status', 'pending')
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    return { kind: 'error', message: error.message };
+  }
+
+  if (!data) {
+    return {
+      kind: 'invalid_transition',
+      message: 'This donor response was already updated.',
+    };
+  }
+
+  return { kind: 'success', match: data };
+};
+
+export const acceptDonorMatch = (matchId: string) =>
+  updatePendingDonorMatchStatus(matchId, 'accepted');
+
+export const declineDonorMatch = (matchId: string) =>
+  updatePendingDonorMatchStatus(matchId, 'declined');
