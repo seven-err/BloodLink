@@ -20,10 +20,29 @@ const schema = z.object({
   token: z.string().min(4, 'Enter the OTP code.'),
 });
 
+const getVerifyOtpErrorMessage = (message: string) => {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes('expired') || normalized.includes('invalid')) {
+    return 'That code is invalid or has expired. Request a new code and try again.';
+  }
+
+  return message;
+};
+
+const getPhoneOtpErrorMessage = (message: string) => {
+  if (message.toLowerCase().includes('unsupported phone provider')) {
+    return 'Phone OTP is not enabled yet. You can continue with Google, Apple, or email instead.';
+  }
+
+  return message;
+};
+
 type FormValues = z.infer<typeof schema>;
 
 export function VerifyOtpScreen({ route }: Props) {
   const [error, setError] = useState<string | null>(null);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const {
@@ -39,27 +58,40 @@ export function VerifyOtpScreen({ route }: Props) {
 
   const onSubmit = async ({ token }: FormValues) => {
     setError(null);
+    setResendMessage(null);
     setLoading(true);
 
-    const { error: verifyError } = await verifyPhoneOtp(route.params.phone, token);
+    try {
+      const { error: verifyError } = await verifyPhoneOtp(route.params.phone, token);
 
-    setLoading(false);
-
-    if (verifyError) {
-      setError(verifyError.message);
+      if (verifyError) {
+        setError(getVerifyOtpErrorMessage(verifyError.message));
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Unable to verify the code.');
+    } finally {
+      setLoading(false);
     }
   };
 
   const onResend = async () => {
     setError(null);
+    setResendMessage(null);
     setResending(true);
 
-    const { error: resendError } = await requestPhoneOtp(route.params.phone);
+    try {
+      const { error: resendError } = await requestPhoneOtp(route.params.phone);
 
-    setResending(false);
+      if (resendError) {
+        setError(getPhoneOtpErrorMessage(resendError.message));
+        return;
+      }
 
-    if (resendError) {
-      setError(resendError.message);
+      setResendMessage(`A new code was sent to ${route.params.phone}.`);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Unable to resend the code.');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -96,6 +128,7 @@ export function VerifyOtpScreen({ route }: Props) {
             )}
           />
           {error ? <Text style={authStyles.error}>{error}</Text> : null}
+          {resendMessage ? <Text style={authStyles.helper}>{resendMessage}</Text> : null}
           <PrimaryButton
             loading={loading}
             title={route.params.mode === 'signup' ? 'Verify and continue' : 'Verify login'}

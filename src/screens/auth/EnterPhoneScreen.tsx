@@ -52,19 +52,26 @@ export function EnterPhoneScreen({ navigation, route }: Props) {
     setLoading(true);
 
     const normalizedPhone = normalizePhoneNumber(phone);
-    const { error: otpError } = await requestPhoneOtp(normalizedPhone);
 
-    setLoading(false);
+    try {
+      const { error: otpError } = await requestPhoneOtp(normalizedPhone);
 
-    if (otpError) {
-      setError(getPhoneOtpErrorMessage(otpError.message));
-      return;
+      if (otpError) {
+        setError(getPhoneOtpErrorMessage(otpError.message));
+        return;
+      }
+
+      navigation.navigate('VerifyOtp', {
+        mode: route.params.mode,
+        phone: normalizedPhone,
+      });
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'Unable to send verification code.',
+      );
+    } finally {
+      setLoading(false);
     }
-
-    navigation.navigate('VerifyOtp', {
-      mode: route.params.mode,
-      phone: normalizedPhone,
-    });
   };
 
   return (
