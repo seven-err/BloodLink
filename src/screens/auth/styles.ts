@@ -30,6 +30,11 @@ export const authStyles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  success: {
+    color: '#15803d',
+    fontSize: 14,
+    lineHeight: 20,
+  },
   link: {
     color: '#b91c1c',
     fontSize: 14,

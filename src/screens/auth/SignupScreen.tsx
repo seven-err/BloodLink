@@ -43,6 +43,9 @@ type SignupValues = z.infer<typeof schema>;
 
 export function SignupScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
+  const [pendingConfirmationEmail, setPendingConfirmationEmail] = useState<string | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -63,10 +66,11 @@ export function SignupScreen({ navigation }: Props) {
 
   const onSubmit = async ({ email, fullName, password, phone }: SignupValues) => {
     setError(null);
+    setPendingConfirmationEmail(null);
     setLoading(true);
 
     try {
-      const { error: signupError } = await signUpWithEmail(
+      const { data, error: signupError } = await signUpWithEmail(
         email,
         password,
         fullName,
@@ -75,6 +79,12 @@ export function SignupScreen({ navigation }: Props) {
 
       if (signupError) {
         setError(signupError.message);
+        return;
+      }
+
+      if (!data.session) {
+        setPendingConfirmationEmail(email);
+        return;
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unable to create your account.');
@@ -94,15 +104,38 @@ export function SignupScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         <AuthBrand />
-        <View style={styles.heading}>
-          <Text style={authStyles.title}>Create your account</Text>
-          <Text style={authStyles.subtitle}>Join BloodLink and be a hero today.</Text>
-        </View>
-        <AuthTabs
-          active="signup"
-          onLogin={() => navigation.navigate('Login')}
-          onSignup={() => undefined}
-        />
+        {pendingConfirmationEmail ? null : (
+          <>
+            <View style={styles.heading}>
+              <Text style={authStyles.title}>Create your account</Text>
+              <Text style={authStyles.subtitle}>Join BloodLink and be a hero today.</Text>
+            </View>
+            <AuthTabs
+              active="signup"
+              onLogin={() => navigation.navigate('Login')}
+              onSignup={() => undefined}
+            />
+          </>
+        )}
+        {pendingConfirmationEmail ? (
+          <View style={styles.confirmationCard}>
+            <Text style={authStyles.title}>Check your email</Text>
+            <Text style={authStyles.subtitle}>
+              We sent a confirmation link to {pendingConfirmationEmail}.
+            </Text>
+            <Text style={authStyles.success}>
+              Open the link in your email to verify your account, then return here to log in.
+            </Text>
+            <Text style={authStyles.helper}>
+              If you do not see the email, check your spam folder or wait a few minutes before
+              trying again.
+            </Text>
+            <PrimaryButton
+              title="Back to login"
+              onPress={() => navigation.navigate('Login')}
+            />
+          </View>
+        ) : (
         <View style={styles.form}>
           <Controller
             control={control}
@@ -203,6 +236,7 @@ export function SignupScreen({ navigation }: Props) {
             <Text style={authStyles.link}>Or sign up with phone OTP</Text>
           </Pressable>
         </View>
+        )}
         <SecurityFooter />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -210,6 +244,9 @@ export function SignupScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  confirmationCard: {
+    gap: 18,
+  },
   content: {
     flexGrow: 1,
     gap: 24,
