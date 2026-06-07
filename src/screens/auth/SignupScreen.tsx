@@ -69,17 +69,21 @@ export function SignupScreen({ navigation }: Props) {
     setError(null);
     setLoading(true);
 
-    const { error: signupError } = await signUpWithEmail(
-      email,
-      password,
-      fullName,
-      normalizePhoneNumber(phone),
-    );
+    try {
+      const { error: signupError } = await signUpWithEmail(
+        email,
+        password,
+        fullName,
+        normalizePhoneNumber(phone),
+      );
 
-    setLoading(false);
-
-    if (signupError) {
-      setError(signupError.message);
+      if (signupError) {
+        setError(signupError.message);
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Unable to create your account.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -100,7 +104,7 @@ export function SignupScreen({ navigation }: Props) {
         </View>
         <AuthTabs
           active="signup"
-          onLogin={() => navigation.navigate('Welcome')}
+          onLogin={() => navigation.navigate('Login')}
           onSignup={() => undefined}
         />
         <View style={styles.form}>

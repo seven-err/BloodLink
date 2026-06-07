@@ -9,7 +9,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "node scripts/no-tests.js",
+    "test": "npm --prefix server test",
+    "check": "npm run typecheck && npm run lint && npm test",
     "prepare": "husky"
   },
   "dependencies": {
@@ -19,7 +20,7 @@
     "@supabase/supabase-js": "^2.107.0",
     "expo": "~54.0.0",
     "expo-location": "~19.0.8",
-    "expo-notifications": "~0.32.17",
+    "expo-notifications": "^0.32.17",
     "expo-secure-store": "~15.0.8",
     "expo-status-bar": "~3.0.9",
     "nativewind": "^4.2.4",
@@ -33,6 +34,7 @@
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-url-polyfill": "^3.0.0",
+    "react-native-worklets": "0.5.1",
     "tailwindcss": "^3.4.19",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"

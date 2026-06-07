@@ -53,12 +53,16 @@ export function LoginScreen({ navigation }: Props) {
     setError(null);
     setLoading(true);
 
-    const { error: loginError } = await signInWithEmail(email, password);
+    try {
+      const { error: loginError } = await signInWithEmail(email, password);
 
-    setLoading(false);
-
-    if (loginError) {
-      setError(loginError.message);
+      if (loginError) {
+        setError(loginError.message);
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Unable to log in.');
+    } finally {
+      setLoading(false);
     }
   };
 

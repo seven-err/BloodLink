@@ -46,7 +46,8 @@ export const completeProfile = ({
 }: ProfileCompletionInput) =>
   supabase
     .from('profiles')
-    .update({
+    .upsert({
+      id: userId,
       full_name: fullName.trim(),
       role,
       blood_type: role === 'donor' ? bloodType : null,
@@ -55,7 +56,8 @@ export const completeProfile = ({
       latitude: latitude ?? null,
       longitude: longitude ?? null,
       is_available: role === 'donor',
+    }, {
+      onConflict: 'id',
     })
-    .eq('id', userId)
     .select()
     .single();

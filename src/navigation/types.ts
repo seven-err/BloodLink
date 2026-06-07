@@ -11,3 +11,9 @@ export type AuthStackParamList = {
   Login: undefined;
   ProfileCompletion: undefined;
 };
+
+export type AppStackParamList = {
+  DonorHome: undefined;
+  RecipientHome: undefined;
+  AppProfile: undefined;
+};

@@ -14,7 +14,7 @@ type AuthNavigatorProps = {
   initialRouteName?: keyof AuthStackParamList;
 };
 
-export function AuthNavigator({ initialRouteName = 'Welcome' }: AuthNavigatorProps) {
+export function AuthNavigator({ initialRouteName = 'Login' }: AuthNavigatorProps) {
   return (
     <Stack.Navigator
       initialRouteName={initialRouteName}
