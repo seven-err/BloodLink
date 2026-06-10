@@ -3,11 +3,12 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 type SocialButtonProps = {
   icon: React.ReactNode;
   title: string;
+  onPress?: () => void;
 };
 
-export function SocialButton({ icon, title }: SocialButtonProps) {
+export function SocialButton({ icon, title, onPress }: SocialButtonProps) {
   return (
-    <Pressable style={styles.button}>
+    <Pressable style={styles.button} onPress={onPress}>
       {icon}
       <Text style={styles.title}>{title}</Text>
     </Pressable>
@@ -18,18 +19,18 @@ const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderColor: '#d7d7d7',
-    borderRadius: 14,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 18,
+    gap: 12,
     justifyContent: 'center',
-    minHeight: 64,
+    minHeight: 56,
     width: '100%',
   },
   title: {
-    color: '#111827',
-    fontSize: 17,
-    fontWeight: '700',
+    color: '#1f2937',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

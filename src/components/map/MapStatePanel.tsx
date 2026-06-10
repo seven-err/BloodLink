@@ -1,5 +1,6 @@
-import { ActivityIndicator, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
+import { Skeleton } from '@/components/common/Skeleton';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { mapStyles } from '@/components/map/styles';
 import { authStyles } from '@/screens/auth/styles';
@@ -34,7 +35,7 @@ export function MapStatePanel({
 
   return (
     <View style={containerStyle}>
-      {loading ? <ActivityIndicator color="#b91c1c" size="large" /> : null}
+      {loading ? <Skeleton borderRadius={16} height={120} width="100%" /> : null}
       <Text style={mapStyles.overlayTitle}>{title}</Text>
       <Text style={error ? authStyles.error : recipientStyles.subtitle}>{message}</Text>
       {primaryAction ? (

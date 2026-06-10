@@ -26,6 +26,10 @@ export type DonorVerificationStatus =
   | 'rejected'
   | 'expired';
 
+export type BloodbankVerificationStatus = 'pending' | 'approved' | 'rejected';
+
+export type OnboardingRole = Extract<UserRole, 'donor' | 'recipient' | 'bloodbank'>;
+
 export type DonorMatchStatus =
   | 'pending'
   | 'accepted'
@@ -96,6 +100,7 @@ export type Database = {
           location: unknown | null;
           address: string | null;
           is_available: boolean;
+          visible_on_map: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -114,6 +119,7 @@ export type Database = {
           longitude?: number | null;
           address?: string | null;
           is_available?: boolean;
+          visible_on_map?: boolean;
         };
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
         Relationships: [];
@@ -143,6 +149,44 @@ export type Database = {
         };
         Update: Partial<
           Database['public']['Tables']['donor_verifications']['Insert']
+        >;
+        Relationships: [];
+      };
+      bloodbank_verifications: {
+        Row: {
+          id: string;
+          profile_id: string;
+          status: BloodbankVerificationStatus;
+          position: string;
+          employee_id: string;
+          hospital_name: string;
+          branch_location: string;
+          work_email: string;
+          work_phone: string;
+          document_paths: string[];
+          notes: string | null;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          profile_id: string;
+          status?: BloodbankVerificationStatus;
+          position: string;
+          employee_id: string;
+          hospital_name: string;
+          branch_location: string;
+          work_email: string;
+          work_phone: string;
+          document_paths: string[];
+          notes?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+        };
+        Update: Partial<
+          Database['public']['Tables']['bloodbank_verifications']['Insert']
         >;
         Relationships: [];
       };
@@ -406,6 +450,8 @@ export type Database = {
           units_needed: number;
           urgency: BloodRequestUrgency;
           needed_at: string | null;
+          hospital_name: string;
+          address: string;
           latitude: number | null;
           longitude: number | null;
           created_at: string;
@@ -426,6 +472,8 @@ export type Database = {
           updated_at: string;
           donor_name: string;
           donor_blood_type: BloodType;
+          donor_verification_active: boolean;
+          donor_verification_status: DonorVerificationStatus | null;
         };
         Relationships: [];
       };
@@ -471,6 +519,27 @@ export type Database = {
           full_name: string;
           blood_type: BloodType;
           distance_meters: number;
+        }[];
+      };
+      nearby_map_donors: {
+        Args: {
+          origin_lat: number;
+          origin_lng: number;
+          radius_km?: number;
+          max_results?: number;
+          filter_blood_type?: BloodType | null;
+          available_only?: boolean;
+        };
+        Returns: {
+          donor_id: string;
+          full_name: string;
+          blood_type: BloodType;
+          is_available: boolean;
+          latitude: number;
+          longitude: number;
+          donation_count: number;
+          last_donation_at: string | null;
+          is_verified: boolean;
         }[];
       };
       sanitize_user_role: {

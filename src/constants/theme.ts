@@ -1,0 +1,42 @@
+export const colors = {
+  background: '#f9fafb',
+  backgroundTint: '#fef2f2',
+  border: '#e2e8f0',
+  borderAccent: '#fecaca',
+  card: '#ffffff',
+  foreground: '#1a1a1a',
+  muted: '#64748b',
+  mutedLight: '#6b7280',
+  primary: '#dc2626',
+  primaryDark: '#b91c1c',
+  primaryForeground: '#ffffff',
+  primarySoft: '#fee2e2',
+  primaryTint: '#fff7f7',
+  success: '#10b981',
+  successSoft: '#dcfce7',
+  warning: '#f59e0b',
+  warningSoft: '#fef3c7',
+  warningBorder: '#fcd34d',
+  warningText: '#92400e',
+  info: '#3b82f6',
+  infoSoft: '#dbeafe',
+  infoText: '#1e40af',
+  orangeSoft: '#ffedd5',
+  orangeText: '#c2410c',
+} as const;
+
+export const radii = {
+  card: 16,
+  cardLg: 24,
+  pill: 999,
+} as const;
+
+export const shadows = {
+  card: {
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { height: 1, width: 0 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+  },
+} as const;

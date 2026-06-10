@@ -1,16 +1,17 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-
-import { PrimaryButton } from '@/components/common/PrimaryButton';
+import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { DonorTabNavigator } from '@/navigation/DonorTabNavigator';
+import { RecipientTabNavigator } from '@/navigation/RecipientTabNavigator';
 import type { AppStackParamList } from '@/navigation/types';
 import { DonationQrScreen } from '@/screens/donor/DonationQrScreen';
-import { DonorOpenRequestsMapScreen } from '@/screens/donor/DonorOpenRequestsMapScreen';
 import { DonorRequestDetailScreen } from '@/screens/donor/DonorRequestDetailScreen';
-import { DonorRequestFeedScreen } from '@/screens/donor/DonorRequestFeedScreen';
 import { MyDonationsScreen } from '@/screens/donor/MyDonationsScreen';
+import { HemieAIScreen } from '@/screens/hemie/HemieAIScreen';
 import { EditProfileScreen } from '@/screens/profile/EditProfileScreen';
+import { AccountSettingsScreen } from '@/screens/profile/AccountSettingsScreen';
+import { ProfilePictureScreen } from '@/screens/profile/ProfilePictureScreen';
+import { SettingsDetailScreen } from '@/screens/profile/SettingsDetailScreen';
 import { SettingsScreen } from '@/screens/profile/SettingsScreen';
 import { UserProfileScreen } from '@/screens/profile/UserProfileScreen';
 import { BloodRequestDetailScreen } from '@/screens/recipient/BloodRequestDetailScreen';
@@ -18,123 +19,22 @@ import { CreateBloodRequestScreen } from '@/screens/recipient/CreateBloodRequest
 import { MyBloodRequestsScreen } from '@/screens/recipient/MyBloodRequestsScreen';
 import { ChatThreadScreen } from '@/screens/ChatThreadScreen';
 import { NotificationsScreen } from '@/screens/NotificationsScreen';
+import { NearbyDonorDetailScreen } from '@/screens/donor/NearbyDonorDetailScreen';
+import { NearbyDonorsMapScreen } from '@/screens/donor/NearbyDonorsMapScreen';
 import { RestrictedAccessScreen } from '@/screens/RestrictedAccessScreen';
 import { isMobileAppRole } from '@/utils/roles';
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 
-type HomeRouteName = 'DonorHome' | 'RecipientHome';
-type HomeProps =
-  | NativeStackScreenProps<AppStackParamList, 'DonorHome'>
-  | NativeStackScreenProps<AppStackParamList, 'RecipientHome'>;
-
-const homeContent = {
-  DonorHome: {
-    actionTitle: 'View donor profile',
-    eyebrow: 'Donor dashboard',
-    sections: [
-      { key: 'availability', label: 'Availability', route: 'AppProfile' as const },
-      { key: 'nearby', label: 'Nearby requests', route: 'DonorRequestFeed' as const },
-      { key: 'donations', label: 'My donations', route: 'MyDonations' as const },
-      { key: 'notifications', label: 'Notifications', route: 'Notifications' as const },
-    ],
-    subtitle: 'Track availability, nearby requests, matches, and donation reminders here.',
-  },
-  RecipientHome: {
-    actionTitle: 'View recipient profile',
-    eyebrow: 'Recipient dashboard',
-    sections: [
-      { key: 'requests', label: 'Blood requests', route: 'MyBloodRequests' as const },
-      { key: 'matches', label: 'Donor matches', route: 'MyBloodRequests' as const },
-      { key: 'notifications', label: 'Notifications', route: 'Notifications' as const },
-    ],
-    subtitle: 'Create requests, follow donor matches, and receive request updates here.',
-  },
-} satisfies Record<
-  HomeRouteName,
-  {
-    actionTitle: string;
-    eyebrow: string;
-    sections: Array<{
-      key: string;
-      label: string;
-      route: keyof AppStackParamList | null;
-    }>;
-    subtitle: string;
-  }
->;
-
-function RoleHomeScreen({ navigation, route }: HomeProps) {
-  const { profile } = useAuth();
-  const content = homeContent[route.name];
-
-  return (
-    <View style={styles.screen}>
-      <View style={styles.card}>
-        <Text style={styles.eyebrow}>{content.eyebrow}</Text>
-        <Text style={styles.title}>
-          {profile?.full_name ? `Hi, ${profile.full_name}` : 'Welcome to BloodLink'}
-        </Text>
-        <Text style={styles.subtitle}>{content.subtitle}</Text>
-      </View>
-
-      <View style={styles.sectionGrid}>
-        {content.sections.map((section) => {
-          const card = (
-            <View
-              key={section.key}
-              style={[styles.sectionCard, section.route ? styles.sectionCardInteractive : null]}
-            >
-              <Text style={styles.sectionText}>{section.label}</Text>
-            </View>
-          );
-
-          if (!section.route) {
-            return card;
-          }
-
-          return (
-            <Pressable
-              key={section.key}
-              style={styles.sectionPressable}
-              onPress={() => navigation.navigate(section.route!)}
-            >
-              {card}
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View style={styles.actions}>
-        {route.name === 'RecipientHome' ? (
-          <PrimaryButton
-            title="Create blood request"
-            onPress={() => navigation.navigate('CreateBloodRequest')}
-          />
-        ) : null}
-        <PrimaryButton
-          title={content.actionTitle}
-          onPress={() => navigation.navigate('AppProfile')}
-        />
-        <PrimaryButton
-          title="Settings"
-          variant="secondary"
-          onPress={() => navigation.navigate('Settings')}
-        />
-      </View>
-    </View>
-  );
-}
-
 export function AppNavigator() {
   const { profile } = useAuth();
 
-  if (!isMobileAppRole(profile?.role)) {
+  if (profile && !isMobileAppRole(profile.role)) {
     return <RestrictedAccessScreen />;
   }
 
-  const initialRouteName: HomeRouteName =
-    profile.role === 'donor' ? 'DonorHome' : 'RecipientHome';
+  const isDonor = !profile || profile.role === 'donor';
+  const initialRouteName = isDonor ? 'DonorTabs' : 'RecipientTabs';
 
   return (
     <Stack.Navigator
@@ -142,21 +42,26 @@ export function AppNavigator() {
       initialRouteName={initialRouteName}
       screenOptions={{
         contentStyle: {
-          backgroundColor: '#fef2f2',
+          backgroundColor: colors.background,
         },
         headerShadowVisible: false,
-        headerTintColor: '#991b1b',
+        headerTintColor: colors.primaryDark,
       }}
     >
       <Stack.Screen
-        component={RoleHomeScreen}
-        name="DonorHome"
-        options={{ headerBackVisible: false, title: 'Donor Home' }}
+        component={DonorTabNavigator}
+        name="DonorTabs"
+        options={{ headerShown: false }}
       />
       <Stack.Screen
-        component={RoleHomeScreen}
-        name="RecipientHome"
-        options={{ headerBackVisible: false, title: 'Recipient Home' }}
+        component={RecipientTabNavigator}
+        name="RecipientTabs"
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        component={HemieAIScreen}
+        name="HemieAI"
+        options={{ headerShown: false, presentation: 'card' }}
       />
       <Stack.Screen
         component={UserProfileScreen}
@@ -166,42 +71,27 @@ export function AppNavigator() {
       <Stack.Screen
         component={EditProfileScreen}
         name="EditProfile"
-        options={{ title: 'Edit Profile' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         component={SettingsScreen}
         name="Settings"
-        options={{ title: 'Settings' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
-        component={DonorRequestFeedScreen}
-        name="DonorRequestFeed"
-        options={({ navigation }) => ({
-          title: 'Open Blood Requests',
-          headerRight: () => (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.navigate('DonorOpenRequestsMap')}
-            >
-              <Text style={{ color: '#991b1b', fontWeight: '700' }}>Map</Text>
-            </Pressable>
-          ),
-        })}
+        component={AccountSettingsScreen}
+        name="AccountSettings"
+        options={{ headerShown: false }}
       />
       <Stack.Screen
-        component={DonorOpenRequestsMapScreen}
-        name="DonorOpenRequestsMap"
-        options={({ navigation }) => ({
-          title: 'Requests Map',
-          headerRight: () => (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.navigate('DonorRequestFeed')}
-            >
-              <Text style={{ color: '#991b1b', fontWeight: '700' }}>List</Text>
-            </Pressable>
-          ),
-        })}
+        component={ProfilePictureScreen}
+        name="ProfilePicture"
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        component={SettingsDetailScreen}
+        name="SettingsDetail"
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         component={DonorRequestDetailScreen}
@@ -226,7 +116,7 @@ export function AppNavigator() {
       <Stack.Screen
         component={CreateBloodRequestScreen}
         name="CreateBloodRequest"
-        options={{ title: 'Create Request' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         component={BloodRequestDetailScreen}
@@ -236,75 +126,23 @@ export function AppNavigator() {
       <Stack.Screen
         component={ChatThreadScreen}
         name="ChatThread"
-        options={({ route }) => ({
-          title: route.params.recipientDisplayName?.trim() || 'Chat',
-        })}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         component={NotificationsScreen}
         name="Notifications"
-        options={{ title: 'Notifications' }}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        component={NearbyDonorsMapScreen}
+        name="NearbyDonorsMap"
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        component={NearbyDonorDetailScreen}
+        name="NearbyDonorDetail"
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  actions: {
-    gap: 12,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    gap: 10,
-    padding: 24,
-  },
-  eyebrow: {
-    color: '#b91c1c',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-  screen: {
-    flex: 1,
-    gap: 18,
-    justifyContent: 'center',
-    padding: 24,
-  },
-  sectionCard: {
-    backgroundColor: '#fff7f7',
-    borderColor: '#fecaca',
-    borderRadius: 16,
-    borderWidth: 1,
-    flex: 1,
-    minWidth: 120,
-    padding: 14,
-  },
-  sectionCardInteractive: {
-    backgroundColor: '#fff',
-  },
-  sectionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  sectionPressable: {
-    flex: 1,
-    minWidth: 120,
-  },
-  sectionText: {
-    color: '#7f1d1d',
-    fontWeight: '700',
-  },
-  subtitle: {
-    color: '#4b5563',
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  title: {
-    color: '#991b1b',
-    fontSize: 30,
-    fontWeight: '800',
-  },
-});

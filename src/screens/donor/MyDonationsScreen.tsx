@@ -2,7 +2,6 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -10,6 +9,7 @@ import {
   View,
 } from 'react-native';
 
+import { ContentLoadingSkeleton } from '@/components/common/ContentLoadingSkeleton';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { URGENCY_LABELS } from '@/constants/bloodRequestUrgency';
 import { useAuth } from '@/context/AuthContext';
@@ -120,12 +120,7 @@ export function MyDonationsScreen({ navigation }: Props) {
   };
 
   if (loading) {
-    return (
-      <View style={recipientStyles.centerContent}>
-        <ActivityIndicator color="#b91c1c" size="large" />
-        <Text style={recipientStyles.subtitle}>Loading your donations…</Text>
-      </View>
-    );
+    return <ContentLoadingSkeleton />;
   }
 
   if (error) {
@@ -162,7 +157,7 @@ export function MyDonationsScreen({ navigation }: Props) {
           </Text>
           <PrimaryButton
             title="Browse open requests"
-            onPress={() => navigation.navigate('DonorRequestFeed')}
+            onPress={() => navigation.navigate('DonorTabs', { screen: 'DonorRequestFeed' })}
           />
         </View>
       ) : (

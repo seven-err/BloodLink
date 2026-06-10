@@ -1,252 +1,537 @@
 import { useFocusEffect } from '@react-navigation/native';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
+  Award,
+  Bell,
+  Calendar,
+  Check,
+  ChevronRight,
+  CircleHelp,
+  Droplet,
+  LogOut,
+  Mail,
+  MapPin,
+  Phone,
+  Settings,
+  Shield,
+  UserRound,
+} from 'lucide-react-native';
+import { useCallback, useState, type ReactNode } from 'react';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { PrimaryButton } from '@/components/common/PrimaryButton';
+import { DonorVerificationBadge } from '@/components/donor/DonorVerificationBadge';
+import { Skeleton } from '@/components/common/Skeleton';
+import { ProfileAvatar } from '@/components/profile/ProfileAvatar';
+import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { useSignOut } from '@/hooks/useSignOut';
+import type { DonorTabParamList } from '@/navigation/DonorTabNavigator';
 import type { AppStackParamList } from '@/navigation/types';
 import { authStyles } from '@/screens/auth/styles';
+import { supabase } from '@/services/supabase/client';
+import {
+  listDonorVerifiableItems,
+  type DonorDonationListItem,
+} from '@/services/supabase/donations';
 import {
   getLatestDonorVerification,
+  getProfile,
   isDonorVerificationActive,
-  setDonorAvailability,
-  type DonorVerificationSummary,
 } from '@/services/supabase/profiles';
+import { getDonorEligibilityStat } from '@/utils/donorDonationStats';
 import {
-  formatAvailability,
-  formatDate,
-  formatDateTime,
-  formatRoleLabel,
-  formatVerificationStatus,
-  formatWeight,
-} from '@/utils/profileDisplay';
+  resolveDonorVerificationDisplay,
+  type DonorVerificationDisplay,
+} from '@/utils/donorVerificationDisplay';
+import { formatRoleLabel } from '@/utils/profileDisplay';
 import { sanitizeProfileError } from '@/utils/profileErrors';
-import { profileStyles } from './styles';
+import { profileScreenStyles as styles } from './profileScreenStyles';
 
-type Props = NativeStackScreenProps<AppStackParamList, 'AppProfile'>;
+type Props =
+  | CompositeScreenProps<
+      BottomTabScreenProps<DonorTabParamList, 'AppProfile'>,
+      NativeStackScreenProps<AppStackParamList>
+    >
+  | NativeStackScreenProps<AppStackParamList, 'AppProfile'>;
 
-function ProfileDetailRow({ label, value }: { label: string; value: string }) {
+const formatDonationDate = (value: string | null) => {
+  if (!value) {
+    return 'Date pending';
+  }
+
+  return new Date(value).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+};
+
+const computeResponseRate = (statuses: string[]) => {
+  const responded = statuses.filter((status) =>
+    ['accepted', 'declined', 'completed'].includes(status),
+  );
+
+  if (responded.length === 0) {
+    return null;
+  }
+
+  const positive = responded.filter((status) => status === 'accepted' || status === 'completed')
+    .length;
+
+  return Math.round((positive / responded.length) * 100);
+};
+
+function ProfileSkeleton({ topInset }: { topInset: number }) {
   return (
-    <View style={profileStyles.detailRow}>
-      <Text style={profileStyles.detailLabel}>{label}</Text>
-      <Text style={profileStyles.detailValue}>{value}</Text>
+    <View style={styles.screen}>
+      <View style={[styles.header, { paddingTop: topInset + 8 }]}>
+        <Skeleton height={28} width={100} />
+      </View>
+      <View style={styles.scrollContent}>
+        <Skeleton borderRadius={24} height={220} width="100%" />
+        <Skeleton borderRadius={16} height={180} width="100%" />
+        <Skeleton borderRadius={16} height={200} width="100%" />
+        <Skeleton borderRadius={16} height={240} width="100%" />
+      </View>
+    </View>
+  );
+}
+
+function ContactInfoRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.contactRow}>
+      <View style={styles.contactIconWrap}>{icon}</View>
+      <View style={styles.contactValueWrap}>
+        <Text style={styles.contactLabel}>{label}</Text>
+        <Text style={styles.contactValue}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
+function ProfileMenuRow({
+  badge,
+  icon,
+  label,
+  onPress,
+  showDivider,
+}: {
+  badge?: number;
+  icon: ReactNode;
+  label: string;
+  onPress: () => void;
+  showDivider?: boolean;
+}) {
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.menuRow, pressed ? { opacity: 0.7 } : null]}
+        onPress={onPress}
+      >
+        <View style={styles.menuIconWrap}>{icon}</View>
+        <Text style={styles.menuLabel}>{label}</Text>
+        {badge != null && badge > 0 ? (
+          <View style={styles.menuBadge}>
+            <Text style={styles.menuBadgeText}>{badge}</Text>
+          </View>
+        ) : null}
+        <ChevronRight color={colors.mutedLight} size={20} />
+      </Pressable>
+      {showDivider ? <View style={styles.menuRowDivider} /> : null}
+    </>
+  );
+}
+
+function RecentDonationRow({ item }: { item: DonorDonationListItem }) {
+  const isCompleted =
+    item.donationStatus === 'completed' || item.matchStatus === 'completed';
+
+  return (
+    <View style={styles.donationItem}>
+      <View style={styles.donationIconWrap}>
+        <Calendar color={colors.primary} size={18} />
+      </View>
+      <View style={styles.donationTextWrap}>
+        <Text style={styles.donationHospital}>{item.hospitalName}</Text>
+        <Text style={styles.donationDate}>
+          {formatDonationDate(item.completedAt ?? item.scheduledAt ?? item.createdAt)}
+        </Text>
+      </View>
+      {isCompleted ? (
+        <View
+          style={{
+            alignItems: 'center',
+            backgroundColor: colors.successSoft,
+            borderRadius: 999,
+            height: 28,
+            justifyContent: 'center',
+            width: 28,
+          }}
+        >
+          <Check color={colors.success} size={16} strokeWidth={3} />
+        </View>
+      ) : null}
     </View>
   );
 }
 
 export function UserProfileScreen({ navigation }: Props) {
+  const { top: topInset } = useSafeAreaInsets();
+  const isTabScreen = 'jumpTo' in navigation;
   const { profile, refreshProfile, session } = useAuth();
+  const { clearSignOutError, confirmSignOut, signOutError, signingOut } = useSignOut();
+
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadingDetails, setLoadingDetails] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [verification, setVerification] = useState<DonorVerificationSummary>(null);
-  const [verificationActive, setVerificationActive] = useState(false);
-  const [availabilityLoading, setAvailabilityLoading] = useState(false);
-  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
-  const [availabilitySuccess, setAvailabilitySuccess] = useState<string | null>(null);
+  const [donorVerificationStatus, setDonorVerificationStatus] =
+    useState<DonorVerificationDisplay>('pending');
+  const [totalDonations, setTotalDonations] = useState(0);
+  const [responseRate, setResponseRate] = useState<number | null>(null);
+  const [recentDonations, setRecentDonations] = useState<DonorDonationListItem[]>([]);
 
   const isDonor = profile?.role === 'donor';
   const email = session?.user.email?.trim() || null;
   const phone = profile?.phone?.trim() || session?.user.phone?.trim() || null;
+  const location = profile?.address?.trim() || null;
+  const eligibilityStat = getDonorEligibilityStat(profile?.last_donation_at);
 
-  const loadDonorDetails = useCallback(async () => {
-    if (!session?.user.id || profile?.role !== 'donor') {
-      setVerification(null);
-      setVerificationActive(false);
+  const navigateToStack = useCallback(
+    <RouteName extends keyof AppStackParamList>(
+      screen: RouteName,
+      ...args: undefined extends AppStackParamList[RouteName]
+        ? [params?: AppStackParamList[RouteName]]
+        : [params: AppStackParamList[RouteName]]
+    ) => {
+      const stackNavigation = navigation.getParent();
+      if (stackNavigation) {
+        stackNavigation.navigate(screen, ...args);
+        return;
+      }
+    },
+    [navigation],
+  );
+
+  const loadProfileData = useCallback(async () => {
+    if (!session?.user.id) {
+      setLoading(false);
       return;
     }
 
-    setLoadingDetails(true);
     setError(null);
 
     try {
-      const [verificationResult, activeResult] = await Promise.all([
-        getLatestDonorVerification(session.user.id),
-        isDonorVerificationActive(session.user.id),
-      ]);
+      await refreshProfile();
+
+      const { data: freshProfile } = await getProfile(session.user.id);
+
+      if (freshProfile?.role !== 'donor') {
+        setDonorVerificationStatus('pending');
+        setTotalDonations(0);
+        setResponseRate(null);
+        setRecentDonations([]);
+        return;
+      }
+
+      const [donationsResult, verificationResult, latestVerificationResult, matchesResult] =
+        await Promise.all([
+          listDonorVerifiableItems(session.user.id),
+          isDonorVerificationActive(session.user.id),
+          getLatestDonorVerification(session.user.id),
+          supabase.from('donor_matches').select('status').eq('donor_id', session.user.id),
+        ]);
+
+      if (donationsResult.error) {
+        throw donationsResult.error;
+      }
 
       if (verificationResult.error) {
         throw verificationResult.error;
       }
 
-      if (activeResult.error) {
-        throw activeResult.error;
+      if (latestVerificationResult.error) {
+        throw latestVerificationResult.error;
       }
 
-      setVerification(verificationResult.data);
-      setVerificationActive(Boolean(activeResult.data));
+      if (matchesResult.error) {
+        throw matchesResult.error;
+      }
+
+      setDonorVerificationStatus(
+        resolveDonorVerificationDisplay({
+          latestStatus: latestVerificationResult.data?.status ?? null,
+          verificationActive: Boolean(verificationResult.data),
+        }),
+      );
+
+      const completedDonations = (donationsResult.data ?? []).filter(
+        (item) => item.donationStatus === 'completed' || item.matchStatus === 'completed',
+      );
+      setTotalDonations(completedDonations.length);
+
+      const statuses = (matchesResult.data ?? []).map((match) => match.status);
+      setResponseRate(computeResponseRate(statuses));
+
+      setRecentDonations(
+        [...completedDonations]
+          .sort((left, right) => {
+            const leftDate = new Date(left.completedAt ?? left.createdAt).getTime();
+            const rightDate = new Date(right.completedAt ?? right.createdAt).getTime();
+            return rightDate - leftDate;
+          })
+          .slice(0, 3),
+      );
     } catch (loadError) {
-      setError(sanitizeProfileError(loadError, 'Unable to load donor status.'));
+      setError(sanitizeProfileError(loadError, 'Unable to load profile data.'));
     } finally {
-      setLoadingDetails(false);
+      setLoading(false);
+      setRefreshing(false);
     }
-  }, [profile?.role, session?.user.id]);
-
-  const reloadProfile = useCallback(
-    async (isRefresh = false) => {
-      if (isRefresh) {
-        setRefreshing(true);
-      }
-
-      setError(null);
-
-      try {
-        await refreshProfile();
-        await loadDonorDetails();
-      } catch (loadError) {
-        setError(sanitizeProfileError(loadError, 'Unable to refresh your profile.'));
-      } finally {
-        setRefreshing(false);
-      }
-    },
-    [loadDonorDetails, refreshProfile],
-  );
+  }, [refreshProfile, session?.user.id]);
 
   useFocusEffect(
     useCallback(() => {
-      void reloadProfile();
-    }, [reloadProfile]),
+      setLoading(true);
+      void loadProfileData();
+    }, [loadProfileData]),
   );
 
-  const handleAvailabilityToggle = async (nextValue: boolean) => {
-    if (!session?.user.id || !isDonor || availabilityLoading) {
-      return;
-    }
-
-    if (nextValue && !verificationActive) {
-      setAvailabilityError('You must be verified before turning on availability.');
-      setAvailabilitySuccess(null);
-      return;
-    }
-
-    setAvailabilityLoading(true);
-    setAvailabilityError(null);
-    setAvailabilitySuccess(null);
-
-    try {
-      const { error: updateError } = await setDonorAvailability(session.user.id, nextValue);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      await refreshProfile();
-      setAvailabilitySuccess(
-        nextValue ? 'You are now available for nearby requests.' : 'You are now marked unavailable.',
-      );
-    } catch (toggleError) {
-      setAvailabilityError(
-        sanitizeProfileError(toggleError, 'Unable to update availability. Please try again.'),
-      );
-    } finally {
-      setAvailabilityLoading(false);
-    }
+  const handleRefresh = () => {
+    setRefreshing(true);
+    void loadProfileData();
   };
+
+  if (loading && !profile) {
+    return <ProfileSkeleton topInset={topInset} />;
+  }
 
   if (!profile) {
     return (
-      <View style={profileStyles.screen}>
-        <View style={profileStyles.listContent}>
-          <View style={profileStyles.card}>
-            <Text style={profileStyles.eyebrow}>Profile</Text>
-            <Text style={profileStyles.title}>Profile unavailable</Text>
-            <Text style={profileStyles.subtitle}>
+      <View style={styles.screen}>
+        <View style={[styles.header, { paddingTop: topInset + 8 }]}>
+          <Text style={styles.headerTitle}>Profile</Text>
+        </View>
+        <View style={styles.scrollContent}>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Profile unavailable</Text>
+            <Text style={styles.emptyDonationsText}>
               We could not load your profile details right now.
             </Text>
             {error ? <Text style={authStyles.error}>{error}</Text> : null}
-            <PrimaryButton title="Try again" onPress={() => void reloadProfile()} />
           </View>
         </View>
       </View>
     );
   }
 
+  const displayName = profile.full_name?.trim() || 'BloodLink user';
+
   return (
-    <ScrollView
-      contentContainerStyle={profileStyles.listContent}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => void reloadProfile(true)} />
-      }
-      style={profileStyles.screen}
-    >
-      <View style={profileStyles.card}>
-        <Text style={profileStyles.eyebrow}>Your profile</Text>
-        <Text style={profileStyles.title}>{profile.full_name?.trim() || 'BloodLink user'}</Text>
-        <Text style={profileStyles.subtitle}>
-          Review your account details and manage donor availability.
-        </Text>
-      </View>
-
-      <View style={profileStyles.card}>
-        <Text style={profileStyles.sectionTitle}>Account details</Text>
-        <ProfileDetailRow label="Role" value={formatRoleLabel(profile.role)} />
-        {email ? <ProfileDetailRow label="Email" value={email} /> : null}
-        {phone ? <ProfileDetailRow label="Phone" value={phone} /> : null}
-        <ProfileDetailRow label="Birthdate" value={formatDate(profile.birthdate)} />
-        <ProfileDetailRow label="Address" value={profile.address?.trim() || 'Not set'} />
-      </View>
-
-      {isDonor ? (
-        <View style={profileStyles.card}>
-          <Text style={profileStyles.sectionTitle}>Donor details</Text>
-          <ProfileDetailRow label="Blood type" value={profile.blood_type ?? 'Not set'} />
-          <ProfileDetailRow
-            label="Last donation"
-            value={formatDateTime(profile.last_donation_at)}
-          />
-          <ProfileDetailRow label="Weight" value={formatWeight(profile.weight_kg)} />
-          <ProfileDetailRow
-            label="Verification"
-            value={formatVerificationStatus(verification?.status)}
-          />
-          {loadingDetails ? <ActivityIndicator color="#b91c1c" /> : null}
-          {error ? <Text style={authStyles.error}>{error}</Text> : null}
+    <View style={styles.screen}>
+      <View style={[styles.header, { paddingTop: topInset + 8 }]}>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>Profile</Text>
+          <Pressable
+            accessibilityLabel="Open settings"
+            accessibilityRole="button"
+            style={styles.headerSettingsButton}
+            onPress={() => navigateToStack('Settings')}
+          >
+            <Settings color={colors.foreground} size={20} />
+          </Pressable>
         </View>
-      ) : null}
+      </View>
 
-      {isDonor ? (
-        <View style={profileStyles.availabilityCard}>
-          <View style={profileStyles.availabilityRow}>
-            <View style={{ flex: 1, gap: 4, paddingRight: 12 }}>
-              <Text style={profileStyles.sectionTitle}>Availability</Text>
-              <Text style={profileStyles.helper}>{formatAvailability(profile.is_available)}</Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        showsVerticalScrollIndicator={false}
+      >
+        {loading ? (
+          <>
+            <Skeleton borderRadius={24} height={220} width="100%" />
+            <Skeleton borderRadius={16} height={180} width="100%" />
+          </>
+        ) : (
+          <>
+            <View style={styles.overviewCard}>
+              <View style={styles.overviewHeader}>
+                <View style={styles.avatarWrap}>
+                  <ProfileAvatar
+                    avatarPath={profile.avatar_path}
+                    fullName={profile.full_name}
+                    size={72}
+                  />
+                </View>
+
+                <View style={styles.overviewMeta}>
+                  <View style={styles.nameRow}>
+                    <Text numberOfLines={1} style={styles.userName}>
+                      {displayName}
+                    </Text>
+                    {isDonor ? (
+                      <DonorVerificationBadge status={donorVerificationStatus} />
+                    ) : null}
+                  </View>
+                  <Text style={styles.roleLabel}>{formatRoleLabel(profile.role)}</Text>
+                  {isDonor && profile.blood_type ? (
+                    <View style={styles.bloodTypePill}>
+                      <Droplet color={colors.primary} fill={colors.primary} size={14} />
+                      <Text style={styles.bloodTypePillText}>
+                        {profile.blood_type} Blood Type
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+
+              {isDonor ? (
+                <>
+                  <View style={styles.divider} />
+                  <View style={styles.statRow}>
+                    <View style={styles.statColumn}>
+                      <Text style={styles.statValue}>{totalDonations}</Text>
+                      <Text style={styles.statLabel}>Donations</Text>
+                    </View>
+                    <View style={styles.statColumn}>
+                      <Text style={styles.statValue}>{eligibilityStat.value}</Text>
+                      <Text style={styles.statLabel}>{eligibilityStat.label}</Text>
+                    </View>
+                    <View style={styles.statColumn}>
+                      <Text style={styles.statValue}>
+                        {responseRate == null ? '—' : `${responseRate}%`}
+                      </Text>
+                      <Text style={styles.statLabel}>Response</Text>
+                    </View>
+                  </View>
+                </>
+              ) : null}
+
+              <Pressable
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.editProfileButton,
+                  pressed ? { opacity: 0.7 } : null,
+                ]}
+                onPress={() => navigateToStack('EditProfile')}
+              >
+                <UserRound color={colors.foreground} size={18} />
+                <Text style={styles.editProfileText}>Edit Profile</Text>
+              </Pressable>
             </View>
-            <Switch
-              disabled={availabilityLoading || (profile.is_available === false && !verificationActive)}
-              onValueChange={(value) => {
-                void handleAvailabilityToggle(value);
-              }}
-              thumbColor={profile.is_available ? '#fff' : '#f9fafb'}
-              trackColor={{ false: '#d1d5db', true: '#b91c1c' }}
-              value={profile.is_available}
-            />
-          </View>
-          {!verificationActive ? (
-            <Text style={profileStyles.helper}>
-              Complete donor verification before you can appear in nearby request matching.
-            </Text>
-          ) : null}
-          {availabilityError ? <Text style={authStyles.error}>{availabilityError}</Text> : null}
-          {availabilitySuccess ? <Text style={authStyles.success}>{availabilitySuccess}</Text> : null}
-        </View>
-      ) : null}
 
-      <View style={profileStyles.actions}>
-        <PrimaryButton title="Edit profile" onPress={() => navigation.navigate('EditProfile')} />
-        <PrimaryButton
-          title="Settings"
-          variant="secondary"
-          onPress={() => navigation.navigate('Settings')}
-        />
-      </View>
-    </ScrollView>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Contact Information</Text>
+              {email ? (
+                <ContactInfoRow
+                  icon={<Mail color={colors.primary} size={18} />}
+                  label="Email"
+                  value={email}
+                />
+              ) : null}
+              {phone ? (
+                <ContactInfoRow
+                  icon={<Phone color={colors.primary} size={18} />}
+                  label="Phone"
+                  value={phone}
+                />
+              ) : null}
+              <ContactInfoRow
+                icon={<MapPin color={colors.primary} size={18} />}
+                label="Location"
+                value={location || 'Not set'}
+              />
+            </View>
+
+            {isDonor ? (
+              <View style={styles.card}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.cardTitle}>Recent Donations</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => navigateToStack('MyDonations')}
+                  >
+                    <Text style={styles.linkText}>View All</Text>
+                  </Pressable>
+                </View>
+                {recentDonations.length === 0 ? (
+                  <Text style={styles.emptyDonationsText}>
+                    No completed donations yet. Your donation history will appear here.
+                  </Text>
+                ) : (
+                  recentDonations.map((item) => (
+                    <RecentDonationRow key={item.matchId} item={item} />
+                  ))
+                )}
+              </View>
+            ) : null}
+
+            <View style={styles.card}>
+              <ProfileMenuRow
+                icon={<Bell color={colors.primary} size={18} />}
+                label="Notifications"
+                showDivider
+                onPress={() => navigateToStack('Notifications')}
+              />
+              <ProfileMenuRow
+                icon={<Shield color={colors.primary} size={18} />}
+                label="Privacy & Security"
+                showDivider
+                onPress={() => navigateToStack('Settings')}
+              />
+              <ProfileMenuRow
+                icon={<Award color={colors.primary} size={18} />}
+                label="Achievements"
+                showDivider
+                onPress={() => navigateToStack('MyDonations')}
+              />
+              <ProfileMenuRow
+                icon={<CircleHelp color={colors.primary} size={18} />}
+                label="Help & Support"
+                onPress={() => {
+                  if (isTabScreen && isDonor) {
+                    navigation.getParent()?.navigate('HemieAI');
+                    return;
+                  }
+
+                  navigateToStack('HemieAI');
+                }}
+              />
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              disabled={signingOut}
+              style={({ pressed }) => [
+                styles.logoutButton,
+                pressed || signingOut ? { opacity: 0.7 } : null,
+              ]}
+              onPress={() => {
+                clearSignOutError();
+                confirmSignOut();
+              }}
+            >
+              <LogOut color={colors.primary} size={18} />
+              <Text style={styles.logoutText}>{signingOut ? 'Signing out…' : 'Logout'}</Text>
+            </Pressable>
+
+            {error ? <Text style={authStyles.error}>{error}</Text> : null}
+            {signOutError ? <Text style={authStyles.error}>{signOutError}</Text> : null}
+          </>
+        )}
+      </ScrollView>
+    </View>
   );
 }

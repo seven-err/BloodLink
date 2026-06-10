@@ -1,3 +1,10 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
+import type { DonorTabParamList } from '@/navigation/DonorTabNavigator';
+import type { RecipientTabParamList } from '@/navigation/RecipientTabNavigator';
+import type { NearbyMapDonorItem } from '@/services/supabase/nearbyMapDonors';
+import type { BloodType } from '@/types/database';
+
 export type AuthStackParamList = {
   Welcome: undefined;
   Signup: undefined;
@@ -9,22 +16,26 @@ export type AuthStackParamList = {
     mode: 'signup' | 'login';
   };
   Login: undefined;
-  ProfileCompletion: undefined;
 };
 
 export type AppStackParamList = {
-  DonorHome: undefined;
-  RecipientHome: undefined;
+  DonorTabs: NavigatorScreenParams<DonorTabParamList> | undefined;
+  RecipientTabs: NavigatorScreenParams<RecipientTabParamList> | undefined;
+  HemieAI: undefined;
   AppProfile: undefined;
   EditProfile: undefined;
   Settings: undefined;
-  DonorRequestFeed: undefined;
-  DonorOpenRequestsMap: undefined;
+  AccountSettings: undefined;
+  ProfilePicture: undefined;
+  SettingsDetail: {
+    description: string;
+    title: string;
+  };
   DonorRequestDetail: { requestId: string };
   MyDonations: undefined;
   DonationQr: { matchId: string; donationId?: string };
   MyBloodRequests: undefined;
-  CreateBloodRequest: undefined;
+  CreateBloodRequest: { bloodType?: BloodType } | undefined;
   BloodRequestDetail: { requestId: string };
   ChatThread: {
     bloodRequestId: string;
@@ -33,4 +44,6 @@ export type AppStackParamList = {
     recipientDisplayName?: string;
   };
   Notifications: undefined;
+  NearbyDonorsMap: undefined;
+  NearbyDonorDetail: { donor: NearbyMapDonorItem };
 };

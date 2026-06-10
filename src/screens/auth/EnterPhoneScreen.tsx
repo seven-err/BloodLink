@@ -8,11 +8,11 @@ import { z } from 'zod';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { FormTextInput } from '@/components/forms/FormTextInput';
 import type { AuthStackParamList } from '@/navigation/types';
-import { requestPhoneOtp } from '@/services/supabase/auth';
 import { normalizePhoneNumber } from '@/utils/phone';
+import { AuthBackButton } from './AuthBackButton';
 import { AuthBrand } from './AuthBrand';
 import { AuthDivider } from './AuthDivider';
-import { AuthIcon, MutedIcon } from './icons';
+import { AuthIcon, SocialIcon } from './icons';
 import { SecurityFooter } from './SecurityFooter';
 import { SocialButton } from './SocialButton';
 import { authStyles } from './styles';
@@ -23,18 +23,9 @@ const schema = z.object({
   phone: z.string().min(10, 'Enter a valid phone number.'),
 });
 
-const getPhoneOtpErrorMessage = (message: string) => {
-  if (message.toLowerCase().includes('unsupported phone provider')) {
-    return 'Phone OTP is not enabled yet. You can continue with Google, Apple, or email instead.';
-  }
-
-  return message;
-};
-
 type FormValues = z.infer<typeof schema>;
 
 export function EnterPhoneScreen({ navigation, route }: Props) {
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const {
     control,
@@ -47,31 +38,17 @@ export function EnterPhoneScreen({ navigation, route }: Props) {
     resolver: zodResolver(schema),
   });
 
-  const onSubmit = async ({ phone }: FormValues) => {
-    setError(null);
+  const onSubmit = ({ phone }: FormValues) => {
     setLoading(true);
 
     const normalizedPhone = normalizePhoneNumber(phone);
 
-    try {
-      const { error: otpError } = await requestPhoneOtp(normalizedPhone);
+    navigation.navigate('VerifyOtp', {
+      mode: route.params.mode,
+      phone: normalizedPhone,
+    });
 
-      if (otpError) {
-        setError(getPhoneOtpErrorMessage(otpError.message));
-        return;
-      }
-
-      navigation.navigate('VerifyOtp', {
-        mode: route.params.mode,
-        phone: normalizedPhone,
-      });
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : 'Unable to send verification code.',
-      );
-    } finally {
-      setLoading(false);
-    }
+    setLoading(false);
   };
 
   return (
@@ -84,19 +61,21 @@ export function EnterPhoneScreen({ navigation, route }: Props) {
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
       >
+        <AuthBackButton onPress={() => navigation.goBack()} />
         <AuthBrand />
-        <View style={styles.card}>
+        <View style={styles.heading}>
           <Text style={authStyles.title}>
-            {route.params.mode === 'signup' ? 'Create account' : 'Phone login'}
+            {route.params.mode === 'signup' ? 'Sign up with phone' : 'Continue with phone'}
           </Text>
           <Text style={authStyles.subtitle}>
-            Enter your mobile number and we'll send a one-time verification code.
+            Enter your mobile number and we&apos;ll send a one-time verification code.
           </Text>
-          <View style={styles.socials}>
-            <SocialButton icon={<MutedIcon name="apple" />} title="Continue with Apple" />
-            <SocialButton icon={<AuthIcon name="google" />} title="Continue with Google" />
-          </View>
-          <AuthDivider />
+        </View>
+        <View style={styles.socials}>
+          <SocialButton icon={<SocialIcon name="google" />} title="Continue with Google" />
+        </View>
+        <AuthDivider />
+        <View style={styles.form}>
           <Controller
             control={control}
             name="phone"
@@ -114,12 +93,7 @@ export function EnterPhoneScreen({ navigation, route }: Props) {
               />
             )}
           />
-          {error ? <Text style={authStyles.error}>{error}</Text> : null}
-          <PrimaryButton
-            loading={loading}
-            title="Send OTP"
-            onPress={handleSubmit(onSubmit)}
-          />
+          <PrimaryButton loading={loading} title="Continue" onPress={handleSubmit(onSubmit)} />
           <PrimaryButton
             title={route.params.mode === 'signup' ? 'Sign up with email' : 'Login with email'}
             variant="secondary"
@@ -135,15 +109,19 @@ export function EnterPhoneScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    gap: 18,
-  },
   content: {
     flexGrow: 1,
-    gap: 28,
+    gap: 24,
     justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 44,
+    paddingVertical: 34,
+  },
+  form: {
+    gap: 14,
+  },
+  heading: {
+    alignItems: 'center',
+    gap: 8,
   },
   screen: {
     backgroundColor: '#fafafa',

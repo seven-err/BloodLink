@@ -1,4 +1,4 @@
-import type { Database } from '@/types/database';
+import type { BloodType, Database } from '@/types/database';
 
 import { supabase } from './client';
 
@@ -78,6 +78,296 @@ export const verifyMessagingAuthorized = async (
   }
 
   return { kind: 'authorized' };
+};
+
+export type ConversationPreview = {
+  bloodRequestId: string;
+  donorMatchId: string;
+  otherPartyId: string;
+  displayName: string;
+  bloodType: BloodType | null;
+  lastMessageBody: string;
+  lastMessageAt: string;
+  unreadCount: number;
+};
+
+const MESSAGING_ELIGIBLE_STATUSES = ['accepted', 'completed'] as const;
+
+export const getProfileDisplayName = (profile: {
+  full_name: string;
+  organization_name: string | null;
+  role: string;
+}) => {
+  if (profile.role === 'bloodbank' && profile.organization_name?.trim()) {
+    return profile.organization_name.trim();
+  }
+
+  return profile.full_name.trim() || 'BloodLink user';
+};
+
+const EMPTY_CONVERSATION_SNIPPET = 'Tap to start coordinating';
+
+const getRequesterContactLabel = (request?: {
+  hospital_name: string | null;
+  contact_phone: string | null;
+} | null) =>
+  request?.hospital_name?.trim() || request?.contact_phone?.trim() || 'Request contact';
+
+type EligibleMatch = {
+  id: string;
+  request_id: string;
+  donor_id: string;
+  status: string;
+  updated_at: string;
+  created_at: string;
+};
+
+export const resolveConversationRouteParams = async (
+  donorMatchId: string,
+  bloodRequestId: string,
+  currentUserId: string,
+): Promise<
+  | { kind: 'success'; recipientId: string; recipientDisplayName: string }
+  | { kind: 'error'; message: string }
+> => {
+  const { data: match, error: matchError } = await supabase
+    .from('donor_matches')
+    .select('id, donor_id, request_id, status')
+    .eq('id', donorMatchId)
+    .eq('request_id', bloodRequestId)
+    .maybeSingle();
+
+  if (matchError) {
+    return { kind: 'error', message: matchError.message };
+  }
+
+  if (!match) {
+    return { kind: 'error', message: 'This conversation is not available.' };
+  }
+
+  if (
+    !MESSAGING_ELIGIBLE_MATCH_STATUSES.includes(
+      match.status as (typeof MESSAGING_ELIGIBLE_MATCH_STATUSES)[number],
+    )
+  ) {
+    return {
+      kind: 'error',
+      message: 'Messaging is only available after a match is accepted.',
+    };
+  }
+
+  const { data: request, error: requestError } = await supabase
+    .from('blood_requests')
+    .select('requester_id')
+    .eq('id', bloodRequestId)
+    .maybeSingle();
+
+  if (requestError) {
+    return { kind: 'error', message: requestError.message };
+  }
+
+  if (!request) {
+    return { kind: 'error', message: 'Blood request not found.' };
+  }
+
+  const isRequester = currentUserId === request.requester_id;
+  const isDonor = currentUserId === match.donor_id;
+
+  if (!isRequester && !isDonor) {
+    return { kind: 'error', message: 'You are not a participant in this conversation.' };
+  }
+
+  const otherPartyId = isRequester ? match.donor_id : request.requester_id;
+
+  if (isRequester) {
+    const { data: donorSummary, error: donorSummaryError } = await supabase
+      .from('recipient_donor_match_responses')
+      .select('donor_name')
+      .eq('id', donorMatchId)
+      .maybeSingle();
+
+    if (donorSummaryError) {
+      return { kind: 'error', message: donorSummaryError.message };
+    }
+
+    return {
+      kind: 'success',
+      recipientId: otherPartyId,
+      recipientDisplayName: donorSummary?.donor_name?.trim() || 'BloodLink donor',
+    };
+  }
+
+  const { data: requestDetails, error: requestDetailsError } = await supabase
+    .from('blood_requests')
+    .select('hospital_name, contact_phone')
+    .eq('id', bloodRequestId)
+    .maybeSingle();
+
+  if (requestDetailsError) {
+    return { kind: 'error', message: requestDetailsError.message };
+  }
+
+  return {
+    kind: 'success',
+    recipientId: otherPartyId,
+    recipientDisplayName: getRequesterContactLabel(requestDetails),
+  };
+};
+
+export const listConversations = async (currentUserId: string) => {
+  const { data: donorMatches, error: donorMatchError } = await supabase
+    .from('donor_matches')
+    .select('id, request_id, donor_id, status, updated_at, created_at')
+    .eq('donor_id', currentUserId)
+    .in('status', [...MESSAGING_ELIGIBLE_STATUSES]);
+
+  if (donorMatchError) {
+    return { data: null, error: donorMatchError };
+  }
+
+  const { data: ownedRequests, error: ownedRequestError } = await supabase
+    .from('blood_requests')
+    .select('id')
+    .eq('requester_id', currentUserId);
+
+  if (ownedRequestError) {
+    return { data: null, error: ownedRequestError };
+  }
+
+  const ownedRequestIds = (ownedRequests ?? []).map((request) => request.id);
+
+  let requesterMatches: EligibleMatch[] = [];
+
+  if (ownedRequestIds.length > 0) {
+    const { data, error: requesterMatchError } = await supabase
+      .from('donor_matches')
+      .select('id, request_id, donor_id, status, updated_at, created_at')
+      .in('request_id', ownedRequestIds)
+      .in('status', [...MESSAGING_ELIGIBLE_STATUSES]);
+
+    if (requesterMatchError) {
+      return { data: null, error: requesterMatchError };
+    }
+
+    requesterMatches = data ?? [];
+  }
+
+  const matchById = new Map<string, EligibleMatch>();
+
+  for (const match of [...(donorMatches ?? []), ...requesterMatches]) {
+    matchById.set(match.id, match);
+  }
+
+  if (matchById.size === 0) {
+    return { data: [], error: null };
+  }
+
+  const matchIds = [...matchById.keys()];
+  const requestIds = [...new Set([...matchById.values()].map((match) => match.request_id))];
+
+  const [
+    { data: requests, error: requestError },
+    { data: rawMessages, error: messageError },
+    { data: donorSummaries, error: donorSummaryError },
+  ] = await Promise.all([
+    supabase
+      .from('blood_requests')
+      .select('id, requester_id, hospital_name, contact_phone')
+      .in('id', requestIds),
+    supabase
+      .from('messages')
+      .select(
+        'id, sender_id, recipient_id, blood_request_id, donor_match_id, body, status, read_at, created_at',
+      )
+      .in('donor_match_id', matchIds)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('recipient_donor_match_responses')
+      .select('id, donor_name, donor_blood_type')
+      .in('id', matchIds),
+  ]);
+
+  if (requestError) {
+    return { data: null, error: requestError };
+  }
+
+  if (messageError) {
+    return { data: null, error: messageError };
+  }
+
+  if (donorSummaryError) {
+    return { data: null, error: donorSummaryError };
+  }
+
+  type ConversationMessage = NonNullable<typeof rawMessages>[number];
+
+  const messagesByMatch = new Map<string, ConversationMessage[]>();
+
+  for (const message of rawMessages ?? []) {
+    if (!message.donor_match_id) {
+      continue;
+    }
+
+    const existing = messagesByMatch.get(message.donor_match_id) ?? [];
+    existing.push(message);
+    messagesByMatch.set(message.donor_match_id, existing);
+  }
+
+  const requestById = new Map((requests ?? []).map((request) => [request.id, request]));
+  const donorSummaryByMatchId = new Map(
+    (donorSummaries ?? []).map((summary) => [summary.id, summary]),
+  );
+  const conversations: ConversationPreview[] = [];
+
+  for (const match of matchById.values()) {
+    const request = requestById.get(match.request_id);
+    const requesterId = request?.requester_id;
+
+    if (!requesterId) {
+      continue;
+    }
+
+    const isDonor = currentUserId === match.donor_id;
+    const isRequester = currentUserId === requesterId;
+
+    if (!isDonor && !isRequester) {
+      continue;
+    }
+
+    const otherPartyId = isDonor ? requesterId : match.donor_id;
+    const donorSummary = donorSummaryByMatchId.get(match.id);
+    const displayName = isDonor
+      ? getRequesterContactLabel(request)
+      : donorSummary?.donor_name?.trim() || 'BloodLink donor';
+    const bloodType = isDonor ? null : (donorSummary?.donor_blood_type ?? null);
+
+    const matchMessages = messagesByMatch.get(match.id) ?? [];
+    const latestMessage = matchMessages[0];
+    const unreadCount = matchMessages.filter(
+      (message) =>
+        message.recipient_id === currentUserId &&
+        message.status === 'sent' &&
+        message.read_at === null,
+    ).length;
+
+    conversations.push({
+      bloodRequestId: match.request_id,
+      donorMatchId: match.id,
+      otherPartyId,
+      displayName,
+      bloodType,
+      lastMessageBody: latestMessage?.body ?? EMPTY_CONVERSATION_SNIPPET,
+      lastMessageAt: latestMessage?.created_at ?? match.updated_at ?? match.created_at,
+      unreadCount,
+    });
+  }
+
+  conversations.sort(
+    (left, right) =>
+      new Date(right.lastMessageAt).getTime() - new Date(left.lastMessageAt).getTime(),
+  );
+
+  return { data: conversations, error: null };
 };
 
 export const listMessages = (context: MessageConversationContext) =>

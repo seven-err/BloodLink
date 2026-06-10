@@ -17,10 +17,12 @@ import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { FormTextInput } from '@/components/forms/FormTextInput';
 import type { AuthStackParamList } from '@/navigation/types';
 import { signInWithEmail } from '@/services/supabase/auth';
+import { getLoginErrorMessage } from '@/utils/loginErrors';
 import { loginPasswordSchema } from '@/utils/password';
+import { Phone } from 'lucide-react-native';
 import { AuthBrand } from './AuthBrand';
 import { AuthDivider } from './AuthDivider';
-import { AuthIcon, MutedIcon } from './icons';
+import { AuthIcon, MutedIcon, SocialIcon } from './icons';
 import { AuthTabs } from './AuthTabs';
 import { SecurityFooter } from './SecurityFooter';
 import { SocialButton } from './SocialButton';
@@ -59,7 +61,7 @@ export function LoginScreen({ navigation }: Props) {
       const { error: loginError } = await signInWithEmail(email, password);
 
       if (loginError) {
-        setError(loginError.message);
+        setError(getLoginErrorMessage(loginError.message));
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unable to log in.');
@@ -89,8 +91,12 @@ export function LoginScreen({ navigation }: Props) {
           onSignup={() => navigation.navigate('Signup')}
         />
         <View style={styles.socials}>
-          <SocialButton icon={<MutedIcon name="apple" />} title="Continue with Apple" />
-          <SocialButton icon={<AuthIcon name="google" />} title="Continue with Google" />
+          <SocialButton 
+            icon={<Phone color="#1f2937" size={20} />} 
+            title="Continue with Phone number" 
+            onPress={() => navigation.navigate('EnterPhone', { mode: 'login' })}
+          />
+          <SocialButton icon={<SocialIcon name="google" />} title="Continue with Google" />
         </View>
         <AuthDivider />
         <View style={styles.form}>
@@ -124,13 +130,14 @@ export function LoginScreen({ navigation }: Props) {
                 onChangeText={onChange}
                 onRightIconPress={() => setPasswordVisible((visible) => !visible)}
                 placeholder="Password"
-                rightIcon={<MutedIcon name={passwordVisible ? 'unlock' : 'lock'} />}
+                rightIcon={<MutedIcon name={passwordVisible ? 'eye-off' : 'eye'} />}
                 secureTextEntry={!passwordVisible}
                 value={value}
               />
             )}
           />
           <Pressable
+            style={styles.forgotContainer}
             onPress={() =>
               Alert.alert(
                 'Password reset',
@@ -142,11 +149,6 @@ export function LoginScreen({ navigation }: Props) {
           </Pressable>
           {error ? <Text style={authStyles.error}>{error}</Text> : null}
           <PrimaryButton loading={loading} title="Login" onPress={handleSubmit(onSubmit)} />
-          <PrimaryButton
-            title="Use phone OTP"
-            variant="secondary"
-            onPress={() => navigation.navigate('EnterPhone', { mode: 'login' })}
-          />
         </View>
         <SecurityFooter />
       </ScrollView>
@@ -162,10 +164,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 34,
   },
+  forgotContainer: {
+    alignItems: 'flex-end',
+    marginBottom: 8,
+    marginTop: -4,
+  },
   forgot: {
     color: '#e50914',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 13,
   },
   form: {
     gap: 14,

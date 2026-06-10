@@ -2,6 +2,7 @@
   "expo": {
     "name": "BloodLink",
     "slug": "BloodLink",
+    "scheme": "bloodlink",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/icon.png",
@@ -21,7 +22,8 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "favicon": "./src/assets/favicon.png"
@@ -32,6 +34,12 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Allow BloodLink to use your location to save your profile coordinates for matching."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow BloodLink to access your photos so you can set a profile picture."
         }
       ]
     ]

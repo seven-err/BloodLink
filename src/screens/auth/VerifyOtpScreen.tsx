@@ -1,99 +1,78 @@
-import { zodResolver } from '@hookform/resolvers/zod';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
-import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { z } from 'zod';
+import { useEffect, useState } from 'react';
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '@/components/common/PrimaryButton';
-import { FormTextInput } from '@/components/forms/FormTextInput';
+import { OtpInput } from '@/components/forms/OtpInput';
 import type { AuthStackParamList } from '@/navigation/types';
-import { requestPhoneOtp, verifyPhoneOtp } from '@/services/supabase/auth';
+import { bypassPhoneAuth } from '@/services/supabase/auth';
+import { formatPhoneDisplay } from '@/utils/phone';
+import { AuthBackButton } from './AuthBackButton';
 import { AuthBrand } from './AuthBrand';
-import { AuthIcon } from './icons';
 import { SecurityFooter } from './SecurityFooter';
 import { authStyles } from './styles';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'VerifyOtp'>;
 
-const schema = z.object({
-  token: z.string().min(4, 'Enter the OTP code.'),
-});
+const RESEND_SECONDS = 60;
 
-const getVerifyOtpErrorMessage = (message: string) => {
-  const normalized = message.toLowerCase();
-
-  if (normalized.includes('expired') || normalized.includes('invalid')) {
-    return 'That code is invalid or has expired. Request a new code and try again.';
-  }
-
-  return message;
-};
-
-const getPhoneOtpErrorMessage = (message: string) => {
-  if (message.toLowerCase().includes('unsupported phone provider')) {
-    return 'Phone OTP is not enabled yet. You can continue with Google, Apple, or email instead.';
-  }
-
-  return message;
-};
-
-type FormValues = z.infer<typeof schema>;
-
-export function VerifyOtpScreen({ route }: Props) {
+export function VerifyOtpScreen({ navigation, route }: Props) {
+  const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [resendMessage, setResendMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [resending, setResending] = useState(false);
-  const {
-    control,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<FormValues>({
-    defaultValues: {
-      token: '',
-    },
-    resolver: zodResolver(schema),
-  });
+  const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
 
-  const onSubmit = async ({ token }: FormValues) => {
+  useEffect(() => {
+    if (secondsLeft <= 0) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setSecondsLeft((current) => current - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [secondsLeft]);
+
+  const onVerify = async () => {
+    if (code.length < 6) {
+      setError('Enter the 6-digit code.');
+      return;
+    }
+
     setError(null);
-    setResendMessage(null);
     setLoading(true);
 
     try {
-      const { error: verifyError } = await verifyPhoneOtp(route.params.phone, token);
+      const { error: authError } = await bypassPhoneAuth(route.params.phone);
 
-      if (verifyError) {
-        setError(getVerifyOtpErrorMessage(verifyError.message));
+      if (authError) {
+        setError(
+          authError.message.includes('Email not confirmed')
+            ? 'Phone sign-in is in demo mode. Disable email confirmation in Supabase or use email login.'
+            : authError.message,
+        );
       }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Unable to verify the code.');
+    } catch (verifyError) {
+      setError(
+        verifyError instanceof Error ? verifyError.message : 'Unable to verify your phone.',
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const onResend = async () => {
-    setError(null);
-    setResendMessage(null);
-    setResending(true);
-
-    try {
-      const { error: resendError } = await requestPhoneOtp(route.params.phone);
-
-      if (resendError) {
-        setError(getPhoneOtpErrorMessage(resendError.message));
-        return;
-      }
-
-      setResendMessage(`A new code was sent to ${route.params.phone}.`);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Unable to resend the code.');
-    } finally {
-      setResending(false);
+  const onResend = () => {
+    if (secondsLeft > 0) {
+      return;
     }
+
+    setError(null);
+    setCode('');
+    setSecondsLeft(RESEND_SECONDS);
   };
+
+  const formattedPhone = formatPhoneDisplay(route.params.phone);
 
   return (
     <KeyboardAvoidingView
@@ -105,42 +84,31 @@ export function VerifyOtpScreen({ route }: Props) {
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
       >
+        <AuthBackButton onPress={() => navigation.goBack()} />
         <AuthBrand />
-        <View style={styles.card}>
-          <Text style={authStyles.title}>Verify OTP</Text>
-          <Text style={authStyles.subtitle}>
-            Enter the code sent to {route.params.phone}.
+        <View style={styles.heading}>
+          <Text style={authStyles.title}>Verify Your Phone</Text>
+          <Text style={styles.instruction}>
+            We&apos;ve sent a 6-digit code to{'\n'}
+            <Text style={styles.phone}>{formattedPhone}</Text>
           </Text>
-          <Controller
-            control={control}
-            name="token"
-            render={({ field: { onBlur, onChange, value } }) => (
-              <FormTextInput
-                error={errors.token?.message}
-                keyboardType="number-pad"
-                label=""
-                leftIcon={<AuthIcon name="email" />}
-                onBlur={onBlur}
-                onChangeText={onChange}
-                placeholder="123456"
-                value={value}
-              />
-            )}
-          />
-          {error ? <Text style={authStyles.error}>{error}</Text> : null}
-          {resendMessage ? <Text style={authStyles.helper}>{resendMessage}</Text> : null}
-          <PrimaryButton
-            loading={loading}
-            title={route.params.mode === 'signup' ? 'Verify and continue' : 'Verify login'}
-            onPress={handleSubmit(onSubmit)}
-          />
-          <PrimaryButton
-            loading={resending}
-            title="Resend code"
-            variant="secondary"
-            onPress={onResend}
-          />
         </View>
+        <OtpInput error={error ?? undefined} value={code} onChange={setCode} />
+        <View style={styles.resendRow}>
+          {secondsLeft > 0 ? (
+            <Text style={styles.resendTimer}>Resend code in {secondsLeft}s</Text>
+          ) : (
+            <Pressable onPress={onResend}>
+              <Text style={styles.resendLink}>Resend code</Text>
+            </Pressable>
+          )}
+        </View>
+        <PrimaryButton
+          disabled={code.length < 6}
+          loading={loading}
+          title="Verify"
+          onPress={onVerify}
+        />
         <SecurityFooter />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -148,15 +116,41 @@ export function VerifyOtpScreen({ route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    gap: 18,
-  },
   content: {
     flexGrow: 1,
-    gap: 28,
+    gap: 24,
     justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 44,
+    paddingVertical: 34,
+  },
+  heading: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  instruction: {
+    color: '#6b7280',
+    fontSize: 16,
+    lineHeight: 24,
+    textAlign: 'center',
+  },
+  phone: {
+    color: '#202124',
+    fontWeight: '700',
+  },
+  resendLink: {
+    color: '#e50914',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  resendRow: {
+    alignItems: 'center',
+    marginTop: -8,
+  },
+  resendTimer: {
+    color: '#9ca3af',
+    fontSize: 14,
+    textAlign: 'center',
   },
   screen: {
     backgroundColor: '#fafafa',

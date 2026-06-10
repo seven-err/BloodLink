@@ -18,6 +18,7 @@ export type CreateBloodRequestInput = {
   latitude?: number | null;
   longitude?: number | null;
   notes?: string | null;
+  attachmentPath?: string | null;
 };
 
 export const createBloodRequest = ({
@@ -33,11 +34,13 @@ export const createBloodRequest = ({
   latitude,
   longitude,
   notes,
+  attachmentPath,
 }: CreateBloodRequestInput) =>
   supabase
     .from('blood_requests')
     .insert({
       address: address.trim(),
+      attachment_path: attachmentPath ?? null,
       blood_type: bloodType,
       contact_phone: contactPhone.trim(),
       hospital_name: hospitalName.trim(),

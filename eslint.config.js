@@ -10,6 +10,7 @@ module.exports = tseslint.config(
     ignores: [
       'node_modules/',
       '.expo/',
+      '.expo-web-test/',
       'dist/',
       'build/',
       'web-build/',

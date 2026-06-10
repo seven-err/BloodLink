@@ -1,22 +1,28 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { ArrowLeft, Info, Send } from 'lucide-react-native';
 import {
-  ActivityIndicator,
   FlatList,
-  KeyboardAvoidingView,
   Platform,
-  StyleSheet,
+  Pressable,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ChatSafetyBanner, showChatSafetyBanner } from '@/components/chat/ChatSafetyBanner';
+import { ChatThreadSkeleton } from '@/components/chat/ChatThreadSkeleton';
 import { MessageBubble } from '@/components/chat/MessageBubble';
+import { ConversationAvatar } from '@/components/messages/ConversationAvatar';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
+import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import type { AppStackParamList } from '@/navigation/types';
 import { authStyles } from '@/screens/auth/styles';
+import { chatStyles } from '@/screens/chat/styles';
 import { recipientStyles } from '@/screens/recipient/styles';
 import {
   listMessages,
@@ -31,10 +37,29 @@ type Props = NativeStackScreenProps<AppStackParamList, 'ChatThread'>;
 
 type SendState = 'idle' | 'sending' | 'error';
 
-export function ChatThreadScreen({ route }: Props) {
+const COMPOSER_SPACE = 88;
+const KEYBOARD_COMPOSER_LIFT = 20;
+
+const getInitials = (name: string) => {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+
+  if (parts.length === 0) {
+    return '?';
+  }
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+};
+
+export function ChatThreadScreen({ navigation, route }: Props) {
   const { bloodRequestId, donorMatchId, recipientDisplayName, recipientId } = route.params;
   const { session } = useAuth();
   const currentUserId = session?.user.id;
+  const { bottom: bottomInset, top: topInset } = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
 
   const [messages, setMessages] = useState<AppMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +68,7 @@ export function ChatThreadScreen({ route }: Props) {
   const [draft, setDraft] = useState('');
   const [sendState, setSendState] = useState<SendState>('idle');
   const [sendError, setSendError] = useState<string | null>(null);
+  const [safetyBannerVisible, setSafetyBannerVisible] = useState(true);
 
   const listRef = useRef<FlatList<AppMessage>>(null);
 
@@ -54,6 +80,20 @@ export function ChatThreadScreen({ route }: Props) {
     }),
     [bloodRequestId, donorMatchId, recipientId],
   );
+
+  const headerLabel = recipientDisplayName?.trim() || 'Conversation';
+  const keyboardOpen = keyboardHeight > 0;
+  const composerBottom = keyboardOpen ? keyboardHeight + KEYBOARD_COMPOSER_LIFT : 0;
+  const composerPaddingBottom = keyboardOpen ? 12 : Math.max(bottomInset, 12);
+  const scrollBottomInset = keyboardOpen
+    ? COMPOSER_SPACE + keyboardHeight + KEYBOARD_COMPOSER_LIFT
+    : COMPOSER_SPACE + bottomInset;
+
+  const scrollToBottom = useCallback((animated = true) => {
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToEnd({ animated });
+    });
+  }, []);
 
   const loadMessages = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -114,12 +154,9 @@ export function ChatThreadScreen({ route }: Props) {
         return undefined;
       }
 
-      const subscription = subscribeToMessages(
-        { bloodRequestId, donorMatchId },
-        () => {
-          void loadMessages({ silent: true });
-        },
-      );
+      const subscription = subscribeToMessages({ bloodRequestId, donorMatchId }, () => {
+        void loadMessages({ silent: true });
+      });
 
       return () => {
         subscription.stop();
@@ -144,25 +181,23 @@ export function ChatThreadScreen({ route }: Props) {
       setDraft('');
       setSendState('idle');
       setMessages((current) => [...current, result.message]);
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToEnd({ animated: true });
-      });
+      scrollToBottom();
       return;
     }
 
     setSendState('error');
     setSendError(result.message);
-  }, [bloodRequestId, currentUserId, donorMatchId, draft, recipientId]);
+  }, [bloodRequestId, currentUserId, donorMatchId, draft, recipientId, scrollToBottom]);
 
-  const headerLabel = recipientDisplayName?.trim() || 'Conversation';
+  const showSafetyBanner = useCallback(() => {
+    void showChatSafetyBanner().then(() => {
+      setSafetyBannerVisible(true);
+      listRef.current?.scrollToOffset({ animated: true, offset: 0 });
+    });
+  }, []);
 
   if (loading) {
-    return (
-      <View style={recipientStyles.centerContent}>
-        <ActivityIndicator color="#b91c1c" size="large" />
-        <Text style={recipientStyles.subtitle}>Loading messages…</Text>
-      </View>
-    );
+    return <ChatThreadSkeleton />;
   }
 
   if (error && (accessDenied || messages.length === 0)) {
@@ -177,136 +212,109 @@ export function ChatThreadScreen({ route }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
-      style={styles.container}
-    >
-      <View style={styles.header}>
-        <Text style={styles.headerEyebrow}>Secure chat</Text>
-        <Text style={styles.headerTitle}>{headerLabel}</Text>
-        <Text style={styles.headerSubtitle}>
-          Coordinate donation details. Do not share sensitive contact info unless already authorized
-          through your accepted match.
-        </Text>
+    <View style={chatStyles.screen}>
+      <View style={[chatStyles.header, { paddingTop: topInset + 8 }]}>
+        {navigation.canGoBack() ? (
+          <Pressable
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => navigation.goBack()}
+          >
+            <ArrowLeft color={colors.foreground} size={22} />
+          </Pressable>
+        ) : (
+          <View style={{ width: 22 }} />
+        )}
+        <ConversationAvatar initials={getInitials(headerLabel)} />
+        <View style={chatStyles.headerCopy}>
+          <Text numberOfLines={1} style={chatStyles.headerTitle}>
+            {headerLabel}
+          </Text>
+          <Text style={chatStyles.headerSubtitle}>Secure match chat</Text>
+        </View>
+        {!safetyBannerVisible ? (
+          <Pressable
+            accessibilityLabel="Show secure chat notice"
+            accessibilityRole="button"
+            style={chatStyles.headerInfoButton}
+            onPress={showSafetyBanner}
+          >
+            <Info color={colors.primary} size={18} />
+          </Pressable>
+        ) : (
+          <View style={{ width: 36 }} />
+        )}
       </View>
 
-      {messages.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={recipientStyles.emptyText}>
+      <FlatList
+        ref={listRef}
+        contentContainerStyle={[chatStyles.chatContent, { paddingBottom: scrollBottomInset }]}
+        data={messages}
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        keyboardShouldPersistTaps="handled"
+        keyExtractor={(item) => item.id}
+        ListEmptyComponent={
+          <Text style={chatStyles.emptyHint}>
             No messages yet. Send a message to start coordinating with your matched contact.
           </Text>
-        </View>
-      ) : (
-        <FlatList
-          ref={listRef}
-          contentContainerStyle={styles.messageList}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-          renderItem={({ item }) => (
-            <MessageBubble
-              isOwnMessage={item.sender_id === currentUserId}
-              message={item}
-              showReadState
-            />
-          )}
-          style={styles.messageListContainer}
-        />
-      )}
+        }
+        ListHeaderComponent={
+          <ChatSafetyBanner onVisibilityChange={setSafetyBannerVisible} />
+        }
+        onContentSizeChange={() => {
+          if (messages.length > 0) {
+            scrollToBottom(false);
+          }
+        }}
+        renderItem={({ item }) => (
+          <MessageBubble
+            isOwnMessage={item.sender_id === currentUserId}
+            message={item}
+            showReadState
+          />
+        )}
+        style={chatStyles.chatBody}
+      />
 
-      {error ? <Text style={[authStyles.error, styles.inlineError]}>{error}</Text> : null}
+      {error ? <Text style={[authStyles.error, chatStyles.inlineError]}>{error}</Text> : null}
 
       {!accessDenied ? (
-        <View style={styles.composer}>
-          <TextInput
-            editable={sendState !== 'sending'}
-            multiline
-            placeholder="Type a message…"
-            placeholderTextColor="#9ca3af"
-            style={styles.input}
-            value={draft}
-            onChangeText={setDraft}
-          />
-          <PrimaryButton
-            disabled={!draft.trim()}
-            loading={sendState === 'sending'}
-            title="Send"
-            onPress={() => void handleSend()}
-          />
+        <View
+          style={[
+            chatStyles.composerDock,
+            { bottom: composerBottom, paddingBottom: composerPaddingBottom },
+          ]}
+        >
+          <View style={chatStyles.inputRow}>
+            <TextInput
+              editable={sendState !== 'sending'}
+              multiline
+              placeholder="Type a message…"
+              placeholderTextColor={colors.muted}
+              returnKeyType="send"
+              style={chatStyles.input}
+              value={draft}
+              blurOnSubmit={false}
+              onChangeText={setDraft}
+              onSubmitEditing={() => void handleSend()}
+            />
+            <Pressable
+              accessibilityLabel="Send message"
+              accessibilityRole="button"
+              disabled={!draft.trim() || sendState === 'sending'}
+              style={[
+                chatStyles.sendButton,
+                !draft.trim() || sendState === 'sending' ? chatStyles.sendButtonDisabled : null,
+              ]}
+              onPress={() => void handleSend()}
+            >
+              <Send color={colors.primaryForeground} size={20} />
+            </Pressable>
+          </View>
           {sendError ? <Text style={authStyles.error}>{sendError}</Text> : null}
         </View>
       ) : null}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  composer: {
-    backgroundColor: '#fff',
-    borderTopColor: '#fecaca',
-    borderTopWidth: 1,
-    gap: 10,
-    padding: 16,
-    paddingBottom: 24,
-  },
-  container: {
-    backgroundColor: '#fef2f2',
-    flex: 1,
-  },
-  emptyState: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    padding: 24,
-  },
-  header: {
-    backgroundColor: '#fff',
-    borderBottomColor: '#fecaca',
-    borderBottomWidth: 1,
-    gap: 4,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-  },
-  headerEyebrow: {
-    color: '#b91c1c',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-  },
-  headerSubtitle: {
-    color: '#6b7280',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  headerTitle: {
-    color: '#991b1b',
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  inlineError: {
-    paddingHorizontal: 20,
-    textAlign: 'center',
-  },
-  input: {
-    backgroundColor: '#fff7f7',
-    borderColor: '#fecaca',
-    borderRadius: 14,
-    borderWidth: 1,
-    color: '#1f2937',
-    fontSize: 16,
-    maxHeight: 120,
-    minHeight: 48,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  messageList: {
-    gap: 4,
-    padding: 16,
-    paddingBottom: 8,
-  },
-  messageListContainer: {
-    flex: 1,
-  },
-});

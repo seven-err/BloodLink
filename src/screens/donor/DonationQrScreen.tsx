@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
+import { Skeleton } from '@/components/common/Skeleton';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { URGENCY_LABELS } from '@/constants/bloodRequestUrgency';
 import { useAuth } from '@/context/AuthContext';
@@ -132,9 +133,10 @@ export function DonationQrScreen({ navigation, route }: Props) {
 
   if (loading) {
     return (
-      <View style={recipientStyles.centerContent}>
-        <ActivityIndicator color="#b91c1c" size="large" />
-        <Text style={recipientStyles.subtitle}>Preparing your donation QR code…</Text>
+      <View style={[recipientStyles.screen, { gap: 16, padding: 24 }]}>
+        <Skeleton borderRadius={16} height={96} width="100%" />
+        <Skeleton borderRadius={16} height={280} width="100%" />
+        <Skeleton borderRadius={16} height={120} width="100%" />
       </View>
     );
   }

@@ -34,7 +34,7 @@ const styles = StyleSheet.create({
   },
   indicator: {
     backgroundColor: '#d8d8d8',
-    height: 2,
+    height: 1,
     marginTop: 16,
     width: '100%',
   },
@@ -44,8 +44,8 @@ const styles = StyleSheet.create({
   },
   tabText: {
     color: '#71717a',
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '600',
   },
   tabs: {
     flexDirection: 'row',
