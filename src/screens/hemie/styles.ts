@@ -1,0 +1,133 @@
+import { Platform, StyleSheet } from 'react-native';
+
+import { colors, radii } from '@/constants/theme';
+
+export const hemieStyles = StyleSheet.create({
+  chatBody: {
+    backgroundColor: colors.background,
+    flex: 1,
+  },
+  chatContent: {
+    gap: 16,
+    padding: 20,
+    paddingBottom: 12,
+  },
+  disclaimer: {
+    backgroundColor: colors.primaryTint,
+    borderColor: colors.borderAccent,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  disclaimerLabel: {
+    fontWeight: '700',
+  },
+  disclaimerRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  disclaimerText: {
+    color: colors.primaryDark,
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  headerInfoButton: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 999,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  composerDock: {
+    backgroundColor: colors.card,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    bottom: 0,
+    gap: 10,
+    left: 0,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    position: 'absolute',
+    right: 0,
+  },
+  footer: {
+    gap: 10,
+  },
+  header: {
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    paddingBottom: 14,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  headerCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  headerSubtitle: {
+    color: colors.muted,
+    fontSize: 13,
+  },
+  headerTitle: {
+    color: colors.foreground,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  input: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    color: colors.foreground,
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 20,
+    maxHeight: 120,
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingTop: Platform.OS === 'ios' ? 12 : 10,
+    paddingBottom: Platform.OS === 'ios' ? 12 : 10,
+    textAlignVertical: 'center',
+  },
+  inputRow: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  screen: {
+    backgroundColor: colors.background,
+    flex: 1,
+  },
+  sendButton: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  sendButtonDisabled: {
+    opacity: 0.55,
+  },
+  suggestedGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  suggestedLabel: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  suggestedSection: {
+    gap: 10,
+  },
+});

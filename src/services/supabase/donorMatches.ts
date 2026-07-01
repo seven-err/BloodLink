@@ -137,6 +137,14 @@ export const respondToBloodRequest = async (
       }
     }
 
+    if (/row-level security|permission denied|not authorized/i.test(error.message)) {
+      return {
+        kind: 'error',
+        message:
+          'Unable to record your response. Confirm you are signed in as a donor and the request is still open.',
+      };
+    }
+
     return { kind: 'error', message: error.message };
   }
 
@@ -150,7 +158,7 @@ export type RecipientDonorMatchResponse =
   Database['public']['Views']['recipient_donor_match_responses']['Row'];
 
 const RECIPIENT_DONOR_MATCH_RESPONSE_COLUMNS =
-  'id,request_id,donor_id,status,distance_meters,travel_time_seconds,responded_at,created_at,updated_at,donor_name,donor_blood_type' as const;
+  'id,request_id,donor_id,status,distance_meters,travel_time_seconds,responded_at,created_at,updated_at,donor_name,donor_blood_type,donor_verification_active,donor_verification_status' as const;
 
 export type DonorMatchActionResult =
   | { kind: 'success'; match: DonorMatch }

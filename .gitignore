@@ -5,6 +5,7 @@ node_modules/
 
 # Expo
 .expo/
+.expo-web-test/
 dist/
 build/
 web-build/
@@ -47,3 +48,7 @@ env
 /android
 
 supabase/.temp/
+
+# Local AI editor/assistant configuration
+.claude/
+.cursor/

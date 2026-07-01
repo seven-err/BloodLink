@@ -7,7 +7,7 @@ export type OpenBloodRequestFeedItem =
 
 /** Safe columns exposed to unmatched donors via open_blood_requests_feed. */
 const OPEN_BLOOD_REQUESTS_FEED_COLUMNS =
-  'id,blood_type,units_needed,urgency,needed_at,latitude,longitude,created_at,updated_at' as const;
+  'id,blood_type,units_needed,urgency,needed_at,hospital_name,address,latitude,longitude,created_at,updated_at' as const;
 
 export const getOpenBloodRequestsFeed = () =>
   supabase

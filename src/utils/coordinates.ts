@@ -65,6 +65,19 @@ export const formatApproximateCoordinates = (
   return `Approx. ${approximateCoordinate(coordinates.latitude).toFixed(APPROXIMATE_COORDINATE_DECIMALS)}, ${approximateCoordinate(coordinates.longitude).toFixed(APPROXIMATE_COORDINATE_DECIMALS)}`;
 };
 
+export const formatExactCoordinates = (
+  latitude: number | null,
+  longitude: number | null,
+): string => {
+  const coordinates = getValidCoordinates(latitude, longitude);
+
+  if (!coordinates) {
+    return 'Location not shared';
+  }
+
+  return `${coordinates.latitude.toFixed(5)}, ${coordinates.longitude.toFixed(5)}`;
+};
+
 const EARTH_RADIUS_METERS = 6_371_000;
 
 export const haversineDistanceMeters = (origin: Coordinates, destination: Coordinates): number => {

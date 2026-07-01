@@ -9,6 +9,7 @@ const requireEnv = (name: string, fallback?: string) => {
 };
 
 export const env = {
+  authRedirectUrl: process.env.EXPO_PUBLIC_AUTH_REDIRECT_URL,
   supabaseUrl: requireEnv('EXPO_PUBLIC_SUPABASE_URL'),
   supabaseAnonKey: requireEnv('EXPO_PUBLIC_SUPABASE_ANON_KEY'),
   apiBaseUrl: requireEnv('EXPO_PUBLIC_API_URL', 'http://localhost:3001'),

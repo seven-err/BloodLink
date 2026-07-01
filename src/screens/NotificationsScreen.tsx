@@ -1,21 +1,19 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ArrowLeft } from 'lucide-react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { NotificationCard } from '@/components/notifications/NotificationCard';
+import { NotificationFilterTabs } from '@/components/notifications/NotificationFilterTabs';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
+import { Skeleton } from '@/components/common/Skeleton';
+import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import type { AppStackParamList } from '@/navigation/types';
 import { authStyles } from '@/screens/auth/styles';
-import { recipientStyles } from '@/screens/recipient/styles';
+import { notificationStyles } from '@/screens/notifications/styles';
 import {
   listNotifications,
   markAllNotificationsRead,
@@ -23,59 +21,41 @@ import {
   type AppNotification,
 } from '@/services/supabase/notifications';
 import { subscribeToUserNotifications, unsubscribe } from '@/services/supabase/realtime';
+import {
+  filterNotifications,
+  isImportantNotification,
+  type NotificationFilter,
+} from '@/utils/notificationDisplay';
 import { parseNotificationData } from '@/utils/notificationData';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Notifications'>;
 
-const formatTimestamp = (value: string) => new Date(value).toLocaleString();
-
-const formatTypeLabel = (type: AppNotification['type']) => {
-  switch (type) {
-    case 'blood_request':
-      return 'Blood request';
-    case 'donor_match':
-      return 'Donor match';
-    case 'donation':
-      return 'Donation';
-    case 'verification':
-      return 'Verification';
-    case 'system':
-      return 'System';
-    default:
-      return 'Update';
-  }
-};
-
-function NotificationCard({
-  notification,
-  onPress,
-}: {
-  notification: AppNotification;
-  onPress: () => void;
-}) {
-  const isUnread = notification.read_at === null;
-
+function NotificationsSkeleton({ topInset }: { topInset: number }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.notificationCard, isUnread ? styles.notificationCardUnread : null]}
-    >
-      <View style={styles.notificationHeader}>
-        <Text style={styles.notificationType}>{formatTypeLabel(notification.type)}</Text>
-        {isUnread ? <View style={styles.unreadDot} /> : null}
+    <View style={notificationStyles.screen}>
+      <View style={[notificationStyles.header, { paddingTop: topInset + 8 }]}>
+        <Skeleton borderRadius={8} height={22} width={22} />
+        <Skeleton borderRadius={8} height={20} width={120} />
+        <Skeleton borderRadius={8} height={16} width={72} />
       </View>
-      <Text style={styles.notificationTitle}>{notification.title}</Text>
-      <Text style={styles.notificationBody}>{notification.body}</Text>
-      <Text style={styles.notificationTime}>{formatTimestamp(notification.created_at)}</Text>
-    </Pressable>
+      <View style={notificationStyles.listContent}>
+        <Skeleton borderRadius={999} height={46} width="100%" />
+        <Skeleton borderRadius={16} height={130} width="100%" />
+        <Skeleton borderRadius={16} height={130} width="100%" />
+        <Skeleton borderRadius={16} height={110} width="100%" />
+        <Skeleton borderRadius={16} height={110} width="100%" />
+      </View>
+    </View>
   );
 }
 
 export function NotificationsScreen({ navigation }: Props) {
+  const { top: topInset } = useSafeAreaInsets();
   const { profile, session } = useAuth();
   const userId = session?.user.id;
 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [activeFilter, setActiveFilter] = useState<NotificationFilter>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [markingAllRead, setMarkingAllRead] = useState(false);
@@ -131,7 +111,28 @@ export function NotificationsScreen({ navigation }: Props) {
     }, [loadNotifications, userId]),
   );
 
+  const filterCounts = useMemo(
+    () => ({
+      all: notifications.length,
+      important: notifications.filter((notification) => isImportantNotification(notification))
+        .length,
+      unread: notifications.filter((notification) => notification.read_at === null).length,
+    }),
+    [notifications],
+  );
+
+  const visibleNotifications = useMemo(
+    () => filterNotifications(notifications, activeFilter),
+    [activeFilter, notifications],
+  );
+
+  const unreadCount = filterCounts.unread;
+
   const handleMarkAllRead = useCallback(async () => {
+    if (unreadCount === 0 || markingAllRead) {
+      return;
+    }
+
     setMarkingAllRead(true);
 
     const { error: markError } = await markAllNotificationsRead();
@@ -150,7 +151,7 @@ export function NotificationsScreen({ navigation }: Props) {
       ),
     );
     setMarkingAllRead(false);
-  }, []);
+  }, [markingAllRead, unreadCount]);
 
   const handleOpenNotification = useCallback(
     async (notification: AppNotification) => {
@@ -190,20 +191,13 @@ export function NotificationsScreen({ navigation }: Props) {
     [navigation, profile?.role],
   );
 
-  const unreadCount = notifications.filter((notification) => notification.read_at === null).length;
-
   if (loading) {
-    return (
-      <View style={recipientStyles.centerContent}>
-        <ActivityIndicator color="#b91c1c" size="large" />
-        <Text style={recipientStyles.subtitle}>Loading notifications…</Text>
-      </View>
-    );
+    return <NotificationsSkeleton topInset={topInset} />;
   }
 
   if (error && notifications.length === 0) {
     return (
-      <View style={recipientStyles.centerContent}>
+      <View style={[notificationStyles.screen, { justifyContent: 'center', padding: 24 }]}>
         <Text style={authStyles.error}>{error}</Text>
         <PrimaryButton title="Try again" onPress={() => void loadNotifications()} />
       </View>
@@ -211,100 +205,78 @@ export function NotificationsScreen({ navigation }: Props) {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={recipientStyles.listContent}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => void loadNotifications(true)} />
-      }
-      style={recipientStyles.screen}
-    >
-      <View style={recipientStyles.card}>
-        <Text style={recipientStyles.eyebrow}>In-app updates</Text>
-        <Text style={recipientStyles.title}>Notifications</Text>
-        <Text style={recipientStyles.subtitle}>
-          Stay updated on donor responses, match decisions, and donation records. Messages never
-          include patient names, phone numbers, or other sensitive contact details.
-        </Text>
-        {unreadCount > 0 ? (
-          <PrimaryButton
-            title={markingAllRead ? 'Marking all as read…' : `Mark all as read (${unreadCount})`}
-            variant="secondary"
-            loading={markingAllRead}
+    <View style={notificationStyles.screen}>
+      <View style={[notificationStyles.header, { paddingTop: topInset + 8 }]}>
+        <View style={notificationStyles.headerSide}>
+          <Pressable
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => navigation.goBack()}
+          >
+            <ArrowLeft color={colors.foreground} size={22} />
+          </Pressable>
+        </View>
+        <Text style={notificationStyles.headerTitle}>Notifications</Text>
+        <View style={[notificationStyles.headerSide, { alignItems: 'flex-end' }]}>
+          <Pressable
+            accessibilityLabel="Mark all notifications as read"
+            accessibilityRole="button"
+            disabled={unreadCount === 0 || markingAllRead}
             onPress={() => void handleMarkAllRead()}
-          />
-        ) : null}
+          >
+            <Text
+              style={[
+                notificationStyles.headerAction,
+                unreadCount === 0 || markingAllRead
+                  ? notificationStyles.headerActionDisabled
+                  : null,
+              ]}
+            >
+              {markingAllRead ? 'Marking…' : 'Mark all read'}
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
-      {error ? (
-        <View style={recipientStyles.card}>
-          <Text style={authStyles.error}>{error}</Text>
-          <PrimaryButton title="Retry" variant="secondary" onPress={() => void loadNotifications()} />
-        </View>
-      ) : null}
-
-      {notifications.length === 0 ? (
-        <View style={recipientStyles.card}>
-          <Text style={recipientStyles.emptyText}>
-            No notifications yet. You will see updates here when donors respond, matches change, or
-            donation records are created.
-          </Text>
-        </View>
-      ) : (
-        notifications.map((notification) => (
-          <NotificationCard
-            key={notification.id}
-            notification={notification}
-            onPress={() => void handleOpenNotification(notification)}
+      <ScrollView
+        contentContainerStyle={notificationStyles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={colors.primaryDark}
+            onRefresh={() => void loadNotifications(true)}
           />
-        ))
-      )}
-    </ScrollView>
+        }
+      >
+        <NotificationFilterTabs
+          activeFilter={activeFilter}
+          counts={filterCounts}
+          onChange={setActiveFilter}
+        />
+
+        {error ? <Text style={authStyles.error}>{error}</Text> : null}
+
+        {visibleNotifications.length === 0 ? (
+          <View style={notificationStyles.emptyCard}>
+            <Text style={notificationStyles.emptyText}>
+              {activeFilter === 'unread'
+                ? 'You are all caught up. No unread notifications right now.'
+                : activeFilter === 'important'
+                  ? 'No important notifications yet. High-priority alerts will appear here.'
+                  : 'No notifications yet. You will see updates here when donors respond, matches change, or donation records are created.'}
+            </Text>
+          </View>
+        ) : (
+          visibleNotifications.map((notification) => (
+            <NotificationCard
+              key={notification.id}
+              notification={notification}
+              onPress={() => void handleOpenNotification(notification)}
+            />
+          ))
+        )}
+      </ScrollView>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  notificationBody: {
-    color: '#4b5563',
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  notificationCard: {
-    backgroundColor: '#fff',
-    borderColor: '#fecaca',
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 6,
-    padding: 16,
-  },
-  notificationCardUnread: {
-    backgroundColor: '#fff7f7',
-    borderColor: '#f87171',
-  },
-  notificationHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  notificationTime: {
-    color: '#9ca3af',
-    fontSize: 13,
-  },
-  notificationTitle: {
-    color: '#991b1b',
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  notificationType: {
-    color: '#b91c1c',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-  },
-  unreadDot: {
-    backgroundColor: '#dc2626',
-    borderRadius: 999,
-    height: 10,
-    width: 10,
-  },
-});

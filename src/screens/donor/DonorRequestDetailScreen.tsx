@@ -3,8 +3,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 
+import { BloodTypeBadge } from '@/components/bloodRequest/BloodTypeBadge';
+import { ContentLoadingSkeleton } from '@/components/common/ContentLoadingSkeleton';
+import { SafetyReminderCard } from '@/components/bloodRequest/SafetyReminderCard';
+import { UrgencyBadge } from '@/components/bloodRequest/UrgencyBadge';
 import { RequestLocationMapPreview } from '@/components/map/RequestLocationMapPreview';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
+import { colors } from '@/constants/theme';
 import { URGENCY_LABELS } from '@/constants/bloodRequestUrgency';
 import { useAuth } from '@/context/AuthContext';
 import type { AppStackParamList } from '@/navigation/types';
@@ -18,12 +23,13 @@ import {
   type DonorMatch,
   type MatchedBloodRequestDetails,
 } from '@/services/supabase/donorMatches';
+import { resolveConversationRouteParams } from '@/services/supabase/messages';
 import { isQrEligibleMatchStatus } from '@/services/supabase/donations';
 import {
   getOpenBloodRequestById,
   type OpenBloodRequestFeedItem,
 } from '@/services/supabase/openBloodRequestsFeed';
-import { formatApproximateCoordinates } from '@/utils/coordinates';
+import { formatExactCoordinates } from '@/utils/coordinates';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'DonorRequestDetail'>;
 
@@ -45,6 +51,8 @@ const toFeedPreview = (
     | 'units_needed'
     | 'urgency'
     | 'needed_at'
+    | 'hospital_name'
+    | 'address'
     | 'latitude'
     | 'longitude'
     | 'created_at'
@@ -56,6 +64,8 @@ const toFeedPreview = (
   units_needed: details.units_needed,
   urgency: details.urgency,
   needed_at: details.needed_at,
+  hospital_name: details.hospital_name ?? '',
+  address: details.address ?? '',
   latitude: details.latitude,
   longitude: details.longitude,
   created_at: details.created_at,
@@ -67,6 +77,38 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     <View style={{ gap: 4 }}>
       <Text style={recipientStyles.detailLabel}>{label}</Text>
       <Text style={recipientStyles.detailValue}>{value}</Text>
+    </View>
+  );
+}
+
+function RequestHeroCard({
+  bloodType,
+  unitsNeeded,
+  urgency,
+}: {
+  bloodType: string;
+  unitsNeeded: number;
+  urgency: OpenBloodRequestFeedItem['urgency'];
+}) {
+  return (
+    <View style={recipientStyles.card}>
+      <Text style={recipientStyles.eyebrow}>Request preview</Text>
+      <View style={recipientStyles.cardHeaderRow}>
+        <View style={{ flex: 1, gap: 6 }}>
+          <Text style={recipientStyles.title}>
+            {bloodType} · {unitsNeeded} unit{unitsNeeded === 1 ? '' : 's'}
+          </Text>
+          <View style={recipientStyles.heroBadgeRow}>
+            <BloodTypeBadge bloodType={bloodType} size="lg" />
+            <UrgencyBadge urgency={urgency} />
+          </View>
+        </View>
+      </View>
+      <View style={recipientStyles.infoBanner}>
+        <Text style={recipientStyles.infoBannerText}>
+          Patient and contact details are hidden until your match is accepted.
+        </Text>
+      </View>
     </View>
   );
 }
@@ -85,7 +127,7 @@ function ResponseStatusCard({
   if (responseState === 'responding') {
     return (
       <View style={recipientStyles.card}>
-        <ActivityIndicator color="#b91c1c" />
+        <ActivityIndicator color={colors.primaryDark} />
         <Text style={recipientStyles.subtitle}>Submitting your response…</Text>
       </View>
     );
@@ -158,6 +200,8 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [responseState, setResponseState] = useState<ResponseUiState>('idle');
   const [responseError, setResponseError] = useState<string | null>(null);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [openingChat, setOpeningChat] = useState(false);
 
   const loadRequest = useCallback(async () => {
     if (!donorId) {
@@ -233,6 +277,36 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
     }, [loadRequest]),
   );
 
+  const openMatchChat = useCallback(async () => {
+    if (!donorId || !existingMatch) {
+      setChatError('You must be signed in to open this conversation.');
+      return;
+    }
+
+    setOpeningChat(true);
+    setChatError(null);
+
+    const result = await resolveConversationRouteParams(
+      existingMatch.id,
+      requestId,
+      donorId,
+    );
+
+    setOpeningChat(false);
+
+    if (result.kind === 'error') {
+      setChatError(result.message);
+      return;
+    }
+
+    navigation.navigate('ChatThread', {
+      bloodRequestId: requestId,
+      donorMatchId: existingMatch.id,
+      recipientDisplayName: result.recipientDisplayName,
+      recipientId: result.recipientId,
+    });
+  }, [donorId, existingMatch, navigation, requestId]);
+
   const handleRespond = useCallback(async () => {
     if (!donorId || !request) {
       setResponseError('You must be signed in to respond to this request.');
@@ -275,12 +349,7 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
     hasResponded;
 
   if (loading) {
-    return (
-      <View style={recipientStyles.centerContent}>
-        <ActivityIndicator color="#b91c1c" size="large" />
-        <Text style={recipientStyles.subtitle}>Loading request preview…</Text>
-      </View>
-    );
+    return <ContentLoadingSkeleton rows={2} />;
   }
 
   if (error) {
@@ -291,7 +360,7 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
         <PrimaryButton
           title="Back to open requests"
           variant="secondary"
-          onPress={() => navigation.navigate('DonorRequestFeed')}
+          onPress={() => navigation.navigate('DonorTabs', { screen: 'DonorRequestFeed' })}
         />
       </View>
     );
@@ -305,7 +374,7 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
         <PrimaryButton
           title="Back to open requests"
           variant="secondary"
-          onPress={() => navigation.navigate('DonorRequestFeed')}
+          onPress={() => navigation.navigate('DonorTabs', { screen: 'DonorRequestFeed' })}
         />
       </View>
     );
@@ -340,17 +409,11 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
         {existingMatch && isQrEligibleMatchStatus(existingMatch.status) ? (
           <>
             <PrimaryButton
-              title="Message requester"
-              onPress={() =>
-                navigation.navigate('ChatThread', {
-                  bloodRequestId: requestId,
-                  donorMatchId: existingMatch.id,
-                  recipientDisplayName: 'Request contact',
-                  recipientId: matchedDetails?.requester_id ?? '',
-                })
-              }
-              disabled={!matchedDetails?.requester_id}
+              title="Open secure chat"
+              loading={openingChat}
+              onPress={() => void openMatchChat()}
             />
+            {chatError ? <Text style={authStyles.error}>{chatError}</Text> : null}
             <PrimaryButton
               title="View donation QR"
               variant="secondary"
@@ -366,7 +429,7 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
         <PrimaryButton
           title="Back to open requests"
           variant="secondary"
-          onPress={() => navigation.navigate('DonorRequestFeed')}
+          onPress={() => navigation.navigate('DonorTabs', { screen: 'DonorRequestFeed' })}
         />
       </ScrollView>
     );
@@ -381,38 +444,41 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
       contentContainerStyle={recipientStyles.scrollContent}
       style={recipientStyles.screen}
     >
-      <View style={recipientStyles.card}>
-        <Text style={recipientStyles.eyebrow}>Request preview</Text>
-        <Text style={recipientStyles.title}>
-          {request.blood_type} · {request.units_needed} unit
-          {request.units_needed === 1 ? '' : 's'}
-        </Text>
-        <View style={recipientStyles.badge}>
-          <Text style={recipientStyles.badgeText}>{URGENCY_LABELS[request.urgency]}</Text>
-        </View>
-        <Text style={recipientStyles.subtitle}>
-          Patient and hospital details are hidden until your match is accepted.
-        </Text>
-      </View>
+      <RequestHeroCard
+        bloodType={request.blood_type}
+        unitsNeeded={request.units_needed}
+        urgency={request.urgency}
+      />
 
       <View style={recipientStyles.card}>
-        <DetailRow label="Urgency" value={URGENCY_LABELS[request.urgency]} />
-        <DetailRow label="Units needed" value={String(request.units_needed)} />
-        <DetailRow label="Blood type" value={request.blood_type} />
-        <DetailRow label="Needed by" value={formatDateTime(request.needed_at)} />
-        <DetailRow
-          label="Approximate location"
-          value={formatApproximateCoordinates(request.latitude, request.longitude)}
-        />
-        <DetailRow label="Posted" value={formatDateTime(request.created_at)} />
-        <DetailRow label="Last updated" value={formatDateTime(request.updated_at)} />
+        <Text style={recipientStyles.eyebrow}>Request information</Text>
+        <View style={recipientStyles.detailGrid}>
+          <DetailRow label="Urgency" value={URGENCY_LABELS[request.urgency]} />
+          <DetailRow label="Units needed" value={String(request.units_needed)} />
+          <DetailRow label="Blood type" value={request.blood_type} />
+          <DetailRow label="Needed by" value={formatDateTime(request.needed_at)} />
+          <DetailRow
+            label="Hospital"
+            value={request.hospital_name?.trim() || 'Not provided'}
+          />
+          <DetailRow
+            label="Address"
+            value={request.address?.trim() || 'Not provided'}
+          />
+          <DetailRow
+            label="Coordinates"
+            value={formatExactCoordinates(request.latitude, request.longitude)}
+          />
+          <DetailRow label="Posted" value={formatDateTime(request.created_at)} />
+          <DetailRow label="Last updated" value={formatDateTime(request.updated_at)} />
+        </View>
       </View>
 
       <RequestLocationMapPreview
-        approximate
         latitude={request.latitude}
         longitude={request.longitude}
-        title="Approximate request area"
+        subtitle="Exact request location for navigation and coordination."
+        title="Request location"
       />
 
       {showStatusCard ? (
@@ -429,17 +495,11 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
       {existingMatch && isQrEligibleMatchStatus(existingMatch.status) ? (
         <>
           <PrimaryButton
-            title="Message requester"
-            onPress={() =>
-              navigation.navigate('ChatThread', {
-                bloodRequestId: requestId,
-                donorMatchId: existingMatch.id,
-                recipientDisplayName: 'Request contact',
-                recipientId: matchedDetails?.requester_id ?? '',
-              })
-            }
-            disabled={!matchedDetails?.requester_id}
+            title="Open secure chat"
+            loading={openingChat}
+            onPress={() => void openMatchChat()}
           />
+          {chatError ? <Text style={authStyles.error}>{chatError}</Text> : null}
           <PrimaryButton
             title="View donation QR"
             variant="secondary"
@@ -452,6 +512,8 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
         </>
       ) : null}
 
+      <SafetyReminderCard />
+
       {showRespondButton ? (
         <PrimaryButton
           title={responseState === 'error' ? 'Try again' : 'Respond to request'}
@@ -463,7 +525,7 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
       <PrimaryButton
         title="Back to open requests"
         variant="secondary"
-        onPress={() => navigation.navigate('DonorRequestFeed')}
+        onPress={() => navigation.navigate('DonorTabs', { screen: 'DonorRequestFeed' })}
       />
     </ScrollView>
   );

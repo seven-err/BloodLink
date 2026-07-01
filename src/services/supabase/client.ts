@@ -1,6 +1,7 @@
 import 'react-native-url-polyfill/auto';
 
 import { createClient } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 
 import { env } from '@/config/env';
 import type { Database } from '@/types/database';
@@ -14,7 +15,7 @@ export const supabase = createClient<Database>(
       storage: ExpoSecureStoreAdapter,
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: false,
+      detectSessionInUrl: Platform.OS === 'web',
     },
   },
 );

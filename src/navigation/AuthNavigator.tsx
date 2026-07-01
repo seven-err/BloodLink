@@ -3,21 +3,16 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '@/navigation/types';
 import { EnterPhoneScreen } from '@/screens/auth/EnterPhoneScreen';
 import { LoginScreen } from '@/screens/auth/LoginScreen';
-import { ProfileCompletionScreen } from '@/screens/auth/ProfileCompletionScreen';
 import { SignupScreen } from '@/screens/auth/SignupScreen';
 import { VerifyOtpScreen } from '@/screens/auth/VerifyOtpScreen';
-import { WelcomeScreen } from '@/screens/auth/WelcomeScreen';
+import { WelcomeScreen } from '@/screens/WelcomeScreen';
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
-type AuthNavigatorProps = {
-  initialRouteName?: keyof AuthStackParamList;
-};
-
-export function AuthNavigator({ initialRouteName = 'Login' }: AuthNavigatorProps) {
+export function AuthNavigator() {
   return (
     <Stack.Navigator
-      initialRouteName={initialRouteName}
+      initialRouteName="Welcome"
       screenOptions={{
         contentStyle: {
           backgroundColor: '#fef2f2',
@@ -47,15 +42,6 @@ export function AuthNavigator({ initialRouteName = 'Login' }: AuthNavigatorProps
         component={SignupScreen}
         name="Signup"
         options={{ title: 'Sign Up' }}
-      />
-      <Stack.Screen
-        component={ProfileCompletionScreen}
-        name="ProfileCompletion"
-        options={{
-          headerShown: true,
-          headerBackVisible: false,
-          title: 'Complete Profile',
-        }}
       />
     </Stack.Navigator>
   );

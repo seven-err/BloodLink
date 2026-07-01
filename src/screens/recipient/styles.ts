@@ -1,63 +1,122 @@
 import { StyleSheet } from 'react-native';
 
+import { colors, radii, shadows } from '@/constants/theme';
+
 export const recipientStyles = StyleSheet.create({
   badge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#fee2e2',
-    borderRadius: 999,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radii.pill,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   badgeText: {
-    color: '#991b1b',
+    color: colors.primaryDark,
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'capitalize',
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
+    backgroundColor: colors.card,
+    borderRadius: radii.cardLg,
     gap: 10,
     padding: 20,
+    ...shadows.card,
+  },
+  cardHeaderRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  donorName: {
+    color: colors.foreground,
+    flexShrink: 1,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  donorTitleRow: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    minWidth: 0,
   },
   centerContent: {
     alignItems: 'center',
+    backgroundColor: colors.background,
     flex: 1,
     gap: 12,
     justifyContent: 'center',
     padding: 24,
   },
+  detailGrid: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    gap: 14,
+    paddingTop: 14,
+  },
   detailLabel: {
-    color: '#6b7280',
-    fontSize: 13,
-    fontWeight: '600',
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
   detailValue: {
-    color: '#1f2937',
+    color: colors.foreground,
     fontSize: 16,
     lineHeight: 24,
   },
+  emptyCard: {
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 8,
+    padding: 20,
+    ...shadows.card,
+  },
   emptyText: {
-    color: '#4b5563',
-    fontSize: 16,
-    lineHeight: 24,
+    color: colors.mutedLight,
+    fontSize: 15,
+    lineHeight: 22,
     textAlign: 'center',
   },
   eyebrow: {
-    color: '#b91c1c',
+    color: colors.primaryDark,
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
-  listCard: {
-    backgroundColor: '#fff',
-    borderColor: '#fecaca',
-    borderRadius: 16,
+  heroBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  infoBanner: {
+    backgroundColor: colors.infoSoft,
+    borderColor: '#bfdbfe',
+    borderRadius: radii.card,
     borderWidth: 1,
-    gap: 6,
+    gap: 4,
+    padding: 12,
+  },
+  infoBannerText: {
+    color: colors.infoText,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  listCard: {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 8,
     padding: 16,
+    ...shadows.card,
   },
   listContent: {
     gap: 12,
@@ -65,8 +124,9 @@ export const recipientStyles = StyleSheet.create({
     paddingBottom: 40,
   },
   meta: {
-    color: '#6b7280',
+    color: colors.mutedLight,
     fontSize: 14,
+    lineHeight: 20,
   },
   optionGroup: {
     gap: 8,
@@ -74,10 +134,12 @@ export const recipientStyles = StyleSheet.create({
   pill: {
     alignItems: 'center',
     backgroundColor: '#f3f4f6',
-    borderRadius: 999,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
     minWidth: 72,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   pillGrid: {
     flexDirection: 'row',
@@ -85,7 +147,8 @@ export const recipientStyles = StyleSheet.create({
     gap: 8,
   },
   pillSelected: {
-    backgroundColor: '#b91c1c',
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   pillText: {
     color: '#374151',
@@ -93,30 +156,62 @@ export const recipientStyles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   pillTextSelected: {
-    color: '#fff',
+    color: colors.primaryForeground,
   },
   requestTitle: {
-    color: '#991b1b',
+    color: colors.foreground,
+    flex: 1,
     fontSize: 18,
     fontWeight: '800',
   },
   screen: {
-    backgroundColor: '#fef2f2',
+    backgroundColor: colors.background,
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
+    gap: 12,
     padding: 24,
     paddingBottom: 40,
   },
+  sectionIntro: {
+    gap: 6,
+  },
   subtitle: {
-    color: '#4b5563',
+    color: colors.mutedLight,
     fontSize: 16,
     lineHeight: 24,
   },
+  successText: {
+    color: '#166534',
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 22,
+  },
   title: {
-    color: '#991b1b',
-    fontSize: 28,
+    color: colors.foreground,
+    fontSize: 24,
     fontWeight: '800',
+  },
+  urgencyPillCritical: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  urgencyPillNormal: {
+    backgroundColor: colors.infoSoft,
+    borderColor: '#93c5fd',
+  },
+  urgencyPillTextCritical: {
+    color: colors.primaryForeground,
+  },
+  urgencyPillTextNormal: {
+    color: colors.infoText,
+  },
+  urgencyPillTextUrgent: {
+    color: colors.orangeText,
+  },
+  urgencyPillUrgent: {
+    backgroundColor: colors.orangeSoft,
+    borderColor: '#fdba74',
   },
 });

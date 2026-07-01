@@ -6,8 +6,15 @@ import type {
 } from '@react-navigation/native-stack';
 import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
 
+import { BloodTypeBadge } from '@/components/bloodRequest/BloodTypeBadge';
+import { ContentLoadingSkeleton } from '@/components/common/ContentLoadingSkeleton';
+import { SafetyReminderCard } from '@/components/bloodRequest/SafetyReminderCard';
+import { StatusBadge } from '@/components/bloodRequest/StatusBadge';
+import { UrgencyBadge } from '@/components/bloodRequest/UrgencyBadge';
 import { RequestLocationMapPreview } from '@/components/map/RequestLocationMapPreview';
+import { DonorVerificationBadge } from '@/components/donor/DonorVerificationBadge';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
+import { colors } from '@/constants/theme';
 import { URGENCY_LABELS } from '@/constants/bloodRequestUrgency';
 import type { AppStackParamList } from '@/navigation/types';
 import { authStyles } from '@/screens/auth/styles';
@@ -19,6 +26,7 @@ import {
   listMatchesForRequest,
   type RecipientDonorMatchResponse,
 } from '@/services/supabase/donorMatches';
+import { resolveDonorVerificationDisplay } from '@/utils/donorVerificationDisplay';
 import { formatDistance, formatTravelTime } from '@/utils/travelMetrics';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'BloodRequestDetail'>;
@@ -64,15 +72,22 @@ function DonorResponseCard({
   const isPending = match.status === 'pending';
   const isBusy = actionMatchId === match.id && actionState !== 'idle' && actionState !== 'error';
   const travelTime = formatTravelTime(match.travel_time_seconds);
-  const donorLabel = match.donor_name?.trim() || 'Verified donor';
+  const donorLabel = match.donor_name?.trim() || 'BloodLink donor';
+  const verificationStatus = resolveDonorVerificationDisplay({
+    latestStatus: match.donor_verification_status,
+    verificationActive: match.donor_verification_active,
+  });
 
   return (
     <View style={recipientStyles.listCard}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-        <Text style={recipientStyles.requestTitle}>{donorLabel}</Text>
-        <View style={recipientStyles.badge}>
-          <Text style={recipientStyles.badgeText}>{match.status}</Text>
+      <View style={recipientStyles.cardHeaderRow}>
+        <View style={recipientStyles.donorTitleRow}>
+          <Text numberOfLines={1} style={recipientStyles.donorName}>
+            {donorLabel}
+          </Text>
+          <DonorVerificationBadge status={verificationStatus} />
         </View>
+        <StatusBadge status={match.status} />
       </View>
       <Text style={recipientStyles.meta}>Blood type: {match.donor_blood_type}</Text>
       <Text style={recipientStyles.meta}>{formatDistance(match.distance_meters)}</Text>
@@ -155,7 +170,7 @@ function DonorResponsesSection({
     return (
       <View style={recipientStyles.card}>
         <Text style={recipientStyles.eyebrow}>Donor responses</Text>
-        <ActivityIndicator color="#b91c1c" />
+        <ActivityIndicator color={colors.primaryDark} />
         <Text style={recipientStyles.subtitle}>Loading donor responses…</Text>
       </View>
     );
@@ -183,9 +198,7 @@ function DonorResponsesSection({
       </Text>
 
       {actionSuccessMessage ? (
-        <Text style={[recipientStyles.subtitle, { color: '#166534', fontWeight: '600' }]}>
-          {actionSuccessMessage}
-        </Text>
+        <Text style={recipientStyles.successText}>{actionSuccessMessage}</Text>
       ) : null}
 
       {matches.length === 0 ? (
@@ -340,12 +353,7 @@ export function BloodRequestDetailScreen({ navigation, route }: Props) {
   );
 
   if (loading) {
-    return (
-      <View style={recipientStyles.centerContent}>
-        <ActivityIndicator color="#b91c1c" size="large" />
-        <Text style={recipientStyles.subtitle}>Loading request details…</Text>
-      </View>
-    );
+    return <ContentLoadingSkeleton rows={2} />;
   }
 
   if (error || !request) {
@@ -375,11 +383,13 @@ export function BloodRequestDetailScreen({ navigation, route }: Props) {
       <View style={recipientStyles.card}>
         <Text style={recipientStyles.eyebrow}>Request details</Text>
         <Text style={recipientStyles.title}>
-          {request.blood_type} · {request.units_needed} unit
-          {request.units_needed === 1 ? '' : 's'}
+          {request.patient_name?.trim() || `${request.blood_type} request`}
         </Text>
-        <View style={recipientStyles.badge}>
-          <Text style={recipientStyles.badgeText}>{request.status}</Text>
+        <Text style={recipientStyles.subtitle}>{request.hospital_name}</Text>
+        <View style={recipientStyles.heroBadgeRow}>
+          <BloodTypeBadge bloodType={request.blood_type} size="lg" />
+          <UrgencyBadge urgency={request.urgency} />
+          <StatusBadge status={request.status} />
         </View>
       </View>
 
@@ -406,17 +416,23 @@ export function BloodRequestDetailScreen({ navigation, route }: Props) {
       />
 
       <View style={recipientStyles.card}>
-        <DetailRow label="Urgency" value={URGENCY_LABELS[request.urgency]} />
-        <DetailRow label="Needed by" value={formatDateTime(request.needed_at)} />
-        <DetailRow label="Patient" value={request.patient_name ?? 'Not set'} />
-        <DetailRow label="Hospital" value={request.hospital_name} />
-        <DetailRow label="Contact phone" value={request.contact_phone ?? 'Not set'} />
-        <DetailRow label="Address" value={request.address ?? 'Not set'} />
-        <DetailRow label="Coordinates" value={coordinates} />
-        <DetailRow label="Notes" value={request.notes?.trim() || 'None'} />
-        <DetailRow label="Created" value={formatDateTime(request.created_at)} />
-        <DetailRow label="Last updated" value={formatDateTime(request.updated_at)} />
+        <Text style={recipientStyles.eyebrow}>Full details</Text>
+        <View style={recipientStyles.detailGrid}>
+          <DetailRow label="Units needed" value={String(request.units_needed)} />
+          <DetailRow label="Urgency" value={URGENCY_LABELS[request.urgency]} />
+          <DetailRow label="Needed by" value={formatDateTime(request.needed_at)} />
+          <DetailRow label="Patient" value={request.patient_name ?? 'Not set'} />
+          <DetailRow label="Hospital" value={request.hospital_name} />
+          <DetailRow label="Contact phone" value={request.contact_phone ?? 'Not set'} />
+          <DetailRow label="Address" value={request.address ?? 'Not set'} />
+          <DetailRow label="Coordinates" value={coordinates} />
+          <DetailRow label="Notes" value={request.notes?.trim() || 'None'} />
+          <DetailRow label="Created" value={formatDateTime(request.created_at)} />
+          <DetailRow label="Last updated" value={formatDateTime(request.updated_at)} />
+        </View>
       </View>
+
+      <SafetyReminderCard />
 
       <PrimaryButton
         title="Back to my requests"

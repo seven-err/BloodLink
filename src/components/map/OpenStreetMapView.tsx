@@ -1,12 +1,11 @@
-import { useMemo } from 'react';
-import { Platform, Text, View } from 'react-native';
-import MapView, { Marker, UrlTile, type Region } from 'react-native-maps';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, StyleSheet, Text, View, type DimensionValue } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE, type MapType, type Region } from 'react-native-maps';
 
+import { MapStyleToggle } from '@/components/map/MapStyleToggle';
 import { mapStyles } from '@/components/map/styles';
+import { getMapAttribution, type MapViewMode } from '@/constants/mapTiles';
 import type { Coordinates } from '@/services/location/types';
-import { formatApproximateCoordinates } from '@/utils/coordinates';
-
-const OSM_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 export type MapMarker = {
   id: string;
@@ -23,6 +22,19 @@ type OpenStreetMapViewProps = {
   onMarkerPress?: (markerId: string) => void;
   selectedMarkerId?: string | null;
   height?: number;
+  mapMode?: MapViewMode;
+  onMapModeChange?: (mode: MapViewMode) => void;
+  showStyleToggle?: boolean;
+};
+
+const DEFAULT_MAP_HEIGHT = 280;
+
+const getNativeMapType = (mapMode: MapViewMode): MapType => {
+  if (mapMode === 'satellite') {
+    return Platform.OS === 'ios' ? 'hybrid' : 'satellite';
+  }
+
+  return 'standard';
 };
 
 export function OpenStreetMapView({
@@ -31,46 +43,60 @@ export function OpenStreetMapView({
   showsUserLocation = false,
   onMarkerPress,
   selectedMarkerId = null,
-  height,
+  height = DEFAULT_MAP_HEIGHT,
+  mapMode: mapModeProp,
+  onMapModeChange,
+  showStyleToggle = true,
 }: OpenStreetMapViewProps) {
+  const mapRef = useRef<MapView>(null);
+  const [internalMapMode, setInternalMapMode] = useState<MapViewMode>('standard');
+  const mapMode = mapModeProp ?? internalMapMode;
+  const mapHeight = Math.max(height, DEFAULT_MAP_HEIGHT);
+
+  const setMapMode = (nextMode: MapViewMode) => {
+    if (onMapModeChange) {
+      onMapModeChange(nextMode);
+      return;
+    }
+
+    setInternalMapMode(nextMode);
+  };
+
+  const toggleMapMode = () => {
+    setMapMode(mapMode === 'satellite' ? 'standard' : 'satellite');
+  };
+
   const containerStyle = useMemo(
-    () => [mapStyles.mapContainer, height ? { height } : mapStyles.map],
-    [height],
+    () => [mapStyles.mapContainer, { height: mapHeight, width: '100%' as DimensionValue }],
+    [mapHeight],
   );
 
-  if (Platform.OS === 'web') {
-    const firstMarker = markers[0];
+  const mapStyle = useMemo(
+    () => [styles.mapSurface, { height: mapHeight, width: '100%' as DimensionValue }],
+    [mapHeight],
+  );
 
-    return (
-      <View style={containerStyle}>
-        <View style={mapStyles.mapFallback}>
-          <Text style={mapStyles.calloutTitle}>Map preview unavailable on web</Text>
-          <Text style={mapStyles.mapFallbackText}>
-            {firstMarker
-              ? `${firstMarker.title}${firstMarker.description ? ` · ${firstMarker.description}` : ''}`
-              : 'Open this screen in the mobile app to view the OpenStreetMap view.'}
-          </Text>
-          {firstMarker ? (
-            <Text style={mapStyles.mapFallbackText}>
-              {formatApproximateCoordinates(
-                firstMarker.coordinates.latitude,
-                firstMarker.coordinates.longitude,
-              )}
-            </Text>
-          ) : null}
-        </View>
-      </View>
-    );
-  }
+  const nativeMapType = useMemo(() => getNativeMapType(mapMode), [mapMode]);
+
+  useEffect(() => {
+    mapRef.current?.animateToRegion(region, 280);
+  }, [region]);
 
   return (
     <View style={containerStyle}>
       <MapView
+        ref={mapRef}
         initialRegion={region}
+        mapType={nativeMapType}
+        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+        rotateEnabled={false}
+        pitchEnabled={false}
+        scrollEnabled
+        showsMyLocationButton={false}
         showsUserLocation={showsUserLocation}
-        style={mapStyles.map}
+        style={mapStyle}
+        zoomEnabled
       >
-        <UrlTile flipY={false} maximumZ={19} urlTemplate={OSM_TILE_URL} />
         {markers.map((marker) => (
           <Marker
             key={marker.id}
@@ -82,6 +108,22 @@ export function OpenStreetMapView({
           />
         ))}
       </MapView>
+
+      {showStyleToggle ? (
+        <View style={mapStyles.styleToggle}>
+          <MapStyleToggle mapMode={mapMode} onToggle={toggleMapMode} />
+        </View>
+      ) : null}
+
+      <View pointerEvents="none" style={mapStyles.attributionBar}>
+        <Text style={mapStyles.attributionText}>{getMapAttribution(mapMode)}</Text>
+      </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  mapSurface: {
+    borderRadius: 16,
+  },
+});

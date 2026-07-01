@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import { mapStyles } from '@/components/map/styles';
 import { URGENCY_LABELS } from '@/constants/bloodRequestUrgency';
 import type { OpenBloodRequestFeedItem } from '@/services/supabase/openBloodRequestsFeed';
-import { formatApproximateCoordinates } from '@/utils/coordinates';
+import { formatExactCoordinates } from '@/utils/coordinates';
 
 type BloodRequestMapMarkerContentProps = {
   request: Pick<
@@ -27,7 +27,7 @@ export function BloodRequestMapMarkerContent({
       </Text>
       <Text style={mapStyles.calloutMeta}>{URGENCY_LABELS[request.urgency]}</Text>
       <Text style={mapStyles.calloutMeta}>
-        {formatApproximateCoordinates(request.latitude, request.longitude)}
+        {formatExactCoordinates(request.latitude, request.longitude)}
       </Text>
       {distanceLabel ? <Text style={mapStyles.calloutMeta}>{distanceLabel}</Text> : null}
       {travelTimeLabel ? <Text style={mapStyles.calloutMeta}>{travelTimeLabel}</Text> : null}

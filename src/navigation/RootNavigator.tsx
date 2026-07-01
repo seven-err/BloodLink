@@ -1,29 +1,35 @@
 import { NavigationContainer } from '@react-navigation/native';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '@/context/AuthContext';
 import { AuthProfileErrorScreen } from '@/screens/AuthProfileErrorScreen';
 import { RestrictedAccessScreen } from '@/screens/RestrictedAccessScreen';
-import { isMobileAppRole, isStaffRole } from '@/utils/roles';
+import { isMobileAppRole } from '@/utils/roles';
 import { AppNavigator } from './AppNavigator';
 import { AuthNavigator } from './AuthNavigator';
+import { BloodBankNavigator } from './BloodBankNavigator';
+import { ProfileSetupNavigator } from './ProfileSetupNavigator';
 
 export function RootNavigator() {
-  const { authError, initializing, profile, profileComplete, session } = useAuth();
-  const showRestrictedAccess = Boolean(session && isStaffRole(profile?.role));
-  const showApp = Boolean(
-    session && profileComplete && isMobileAppRole(profile?.role),
-  );
+  const {
+    authError,
+    bloodbankVerification,
+    profile,
+    profileComplete,
+    profileLoading,
+    session,
+  } = useAuth();
 
-  if (initializing) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color="#b91c1c" size="large" />
-        <Text style={styles.loadingText}>Loading BloodLink...</Text>
-        {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
-      </View>
-    );
-  }
+  const profilePending = Boolean(session && profileLoading && !profile);
+  const isAdmin = profile?.role === 'admin';
+  const isBloodbank = profile?.role === 'bloodbank';
+  const showBloodbankApp = Boolean(
+    session && isBloodbank && profileComplete && bloodbankVerification,
+  );
+  const showDonorRecipientApp = Boolean(
+    session && (profilePending || (profileComplete && isMobileAppRole(profile?.role))),
+  );
+  const showProfileSetup = Boolean(session && profile && !profileComplete);
+  const showRestrictedAccess = Boolean(session && profile && isAdmin);
 
   if (authError) {
     return <AuthProfileErrorScreen />;
@@ -31,36 +37,19 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer>
-      {showRestrictedAccess ? (
+      {!session ? (
+        <AuthNavigator />
+      ) : showRestrictedAccess ? (
         <RestrictedAccessScreen />
-      ) : showApp ? (
+      ) : showProfileSetup ? (
+        <ProfileSetupNavigator />
+      ) : showBloodbankApp ? (
+        <BloodBankNavigator verificationStatus={bloodbankVerification!.status} />
+      ) : showDonorRecipientApp ? (
         <AppNavigator />
       ) : (
-        <AuthNavigator
-          key={session ? 'profile-completion' : 'login'}
-          initialRouteName={session ? 'ProfileCompletion' : 'Login'}
-        />
+        <ProfileSetupNavigator />
       )}
     </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  errorText: {
-    color: '#b91c1c',
-    fontSize: 14,
-    paddingHorizontal: 24,
-    textAlign: 'center',
-  },
-  loading: {
-    alignItems: 'center',
-    backgroundColor: '#fef2f2',
-    flex: 1,
-    gap: 12,
-    justifyContent: 'center',
-  },
-  loadingText: {
-    color: '#991b1b',
-    fontWeight: '700',
-  },
-});

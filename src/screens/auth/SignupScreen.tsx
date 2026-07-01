@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   KeyboardAvoidingView,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,9 +14,14 @@ import { z } from 'zod';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { FormTextInput } from '@/components/forms/FormTextInput';
 import type { AuthStackParamList } from '@/navigation/types';
-import { signUpWithEmail } from '@/services/supabase/auth';
+import {
+  getSignupErrorMessage,
+  isDuplicateEmailSignup,
+  resendSignupConfirmation,
+  signUpWithEmail,
+} from '@/services/supabase/auth';
 import { normalizePhoneNumber } from '@/utils/phone';
-import { PASSWORD_RULES, signupPasswordSchema } from '@/utils/password';
+import { signupPasswordSchema } from '@/utils/password';
 import { AuthBrand } from './AuthBrand';
 import { AuthIcon, MutedIcon } from './icons';
 import { AuthTabs } from './AuthTabs';
@@ -46,6 +50,7 @@ export function SignupScreen({ navigation }: Props) {
   const [pendingConfirmationEmail, setPendingConfirmationEmail] = useState<string | null>(
     null,
   );
+  const [resentConfirmation, setResentConfirmation] = useState(false);
   const [loading, setLoading] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -67,6 +72,7 @@ export function SignupScreen({ navigation }: Props) {
   const onSubmit = async ({ email, fullName, password, phone }: SignupValues) => {
     setError(null);
     setPendingConfirmationEmail(null);
+    setResentConfirmation(false);
     setLoading(true);
 
     try {
@@ -78,7 +84,22 @@ export function SignupScreen({ navigation }: Props) {
       );
 
       if (signupError) {
-        setError(signupError.message);
+        setError(getSignupErrorMessage(signupError.message));
+        return;
+      }
+
+      if (isDuplicateEmailSignup(data.user)) {
+        const { error: resendError } = await resendSignupConfirmation(email);
+
+        if (resendError) {
+          setError(
+            'An account with this email already exists. Log in instead, or use Forgot Password if you need access.',
+          );
+          return;
+        }
+
+        setResentConfirmation(true);
+        setPendingConfirmationEmail(email);
         return;
       }
 
@@ -121,14 +142,19 @@ export function SignupScreen({ navigation }: Props) {
           <View style={styles.confirmationCard}>
             <Text style={authStyles.title}>Check your email</Text>
             <Text style={authStyles.subtitle}>
-              We sent a confirmation link to {pendingConfirmationEmail}.
+              {resentConfirmation
+                ? `We resent a confirmation link to ${pendingConfirmationEmail}.`
+                : `We sent a confirmation link to ${pendingConfirmationEmail}.`}
             </Text>
             <Text style={authStyles.success}>
-              Open the link in your email to verify your account, then return here to log in.
+              Tap the confirmation link in your email to verify your account. Keep the BloodLink app
+              or web tab open (Expo web runs on port 8081). After confirming, log in with the same
+              email and password.
             </Text>
             <Text style={authStyles.helper}>
-              If you do not see the email, check your spam folder or wait a few minutes before
-              trying again.
+              If you do not see the email, check your spam folder (including Promotions) or wait a
+              few minutes. Supabase sends from noreply@mail.app.supabase.io — add it to your safe
+              senders if needed.
             </Text>
             <PrimaryButton
               title="Back to login"
@@ -199,7 +225,7 @@ export function SignupScreen({ navigation }: Props) {
                 onChangeText={onChange}
                 onRightIconPress={() => setPasswordVisible((visible) => !visible)}
                 placeholder="Create password"
-                rightIcon={<MutedIcon name={passwordVisible ? 'unlock' : 'lock'} />}
+                rightIcon={<MutedIcon name={passwordVisible ? 'eye-off' : 'eye'} />}
                 secureTextEntry={!passwordVisible}
                 value={value}
               />
@@ -217,27 +243,22 @@ export function SignupScreen({ navigation }: Props) {
                 onChangeText={onChange}
                 onRightIconPress={() => setConfirmVisible((visible) => !visible)}
                 placeholder="Confirm password"
-                rightIcon={<MutedIcon name={confirmVisible ? 'unlock' : 'lock'} />}
+                rightIcon={<MutedIcon name={confirmVisible ? 'eye-off' : 'eye'} />}
                 secureTextEntry={!confirmVisible}
                 value={value}
               />
             )}
           />
-          <View style={styles.rules}>
-            {PASSWORD_RULES.hints.map((hint) => (
-              <Text key={hint} style={styles.rule}>
-                ✓ {hint}
-              </Text>
-            ))}
-          </View>
           {error ? <Text style={authStyles.error}>{error}</Text> : null}
           <PrimaryButton loading={loading} title="Sign Up" onPress={handleSubmit(onSubmit)} />
-          <Pressable onPress={() => navigation.navigate('EnterPhone', { mode: 'signup' })}>
-            <Text style={authStyles.link}>Or sign up with phone OTP</Text>
-          </Pressable>
         </View>
         )}
         <SecurityFooter />
+        {!pendingConfirmationEmail && (
+          <Text style={styles.termsText}>
+            By signing up, you agree to our <Text style={styles.termsLink}>Terms of Service</Text> and <Text style={styles.termsLink}>Privacy Policy</Text>
+          </Text>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -261,16 +282,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  rule: {
-    color: '#71717a',
-    fontSize: 14,
-  },
-  rules: {
-    gap: 8,
-    paddingHorizontal: 2,
-  },
   screen: {
     backgroundColor: '#fafafa',
     flex: 1,
+  },
+  termsText: {
+    color: '#6b7280',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 32,
+    paddingHorizontal: 20,
+  },
+  termsLink: {
+    color: '#e50914',
   },
 });

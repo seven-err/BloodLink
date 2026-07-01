@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { colors } from '@/constants/theme';
 import type { AppMessage } from '@/services/supabase/messages';
 
 type MessageBubbleProps = {
@@ -64,10 +65,10 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   bodyOther: {
-    color: '#1f2937',
+    color: colors.foreground,
   },
   bodyOwn: {
-    color: '#fff',
+    color: colors.primaryForeground,
   },
   bubble: {
     borderRadius: 18,
@@ -77,12 +78,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   bubbleOther: {
-    backgroundColor: '#fff',
-    borderColor: '#fecaca',
+    backgroundColor: colors.card,
+    borderColor: colors.borderAccent,
     borderWidth: 1,
   },
   bubbleOwn: {
-    backgroundColor: '#b91c1c',
+    backgroundColor: colors.primaryDark,
   },
   metaRow: {
     alignItems: 'center',
@@ -91,7 +92,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   readState: {
-    color: '#fecaca',
+    color: colors.borderAccent,
     fontSize: 11,
     fontWeight: '600',
   },
@@ -109,9 +110,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   timestampOther: {
-    color: '#6b7280',
+    color: colors.mutedLight,
   },
   timestampOwn: {
-    color: '#fecaca',
+    color: colors.borderAccent,
   },
 });

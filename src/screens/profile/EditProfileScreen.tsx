@@ -1,101 +1,122 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as Location from 'expo-location';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useEffect, useState } from 'react';
+import { ArrowLeft, MapPin } from 'lucide-react-native';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { z } from 'zod';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PrimaryButton } from '@/components/common/PrimaryButton';
-import { FormTextInput } from '@/components/forms/FormTextInput';
-import { BLOOD_TYPES } from '@/constants/bloodTypes';
+import { Skeleton } from '@/components/common/Skeleton';
+import { BloodTypeSelector } from '@/components/forms/BloodTypeSelector';
+import { FormDatePicker } from '@/components/forms/FormDatePicker';
+import { RequestFormField } from '@/components/forms/RequestFormField';
+import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import type { AppStackParamList } from '@/navigation/types';
-import { authStyles } from '@/screens/auth/styles';
-import { recipientStyles } from '@/screens/recipient/styles';
 import { updateProfile } from '@/services/supabase/profiles';
-import type { BloodType } from '@/types/database';
+import {
+  donorEditProfileSchema,
+  editProfileSchema,
+  type EditProfileFormValues,
+} from '@/utils/editProfileValidation';
+import { MAX_DONOR_WEIGHT_KG, MIN_DONOR_WEIGHT_KG } from '@/utils/donorEligibility';
+import { formatGeocodedAddress } from '@/utils/locationAddress';
 import { formatRoleLabel } from '@/utils/profileDisplay';
 import { sanitizeProfileError } from '@/utils/profileErrors';
-import { profileStyles } from './styles';
+import { editProfileStyles } from './editProfileStyles';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'EditProfile'>;
-
-const isValidBirthdate = (value: string) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  const today = new Date();
-
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day &&
-    date.getTime() <= Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
-  );
-};
-
-const editProfileSchema = z
-  .object({
-    address: z.string().trim().min(3, 'Address is required.'),
-    birthdate: z
-      .string()
-      .trim()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD format.')
-      .refine(isValidBirthdate, 'Enter a valid past birthdate.'),
-    bloodType: z.enum(BLOOD_TYPES as [BloodType, ...BloodType[]]).nullable(),
-    fullName: z.string().trim().min(2, 'Name is required.'),
-    weightKg: z.string().trim(),
-  })
-  .superRefine((value, context) => {
-    if (value.weightKg && !/^\d+(\.\d{1,2})?$/.test(value.weightKg)) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Enter a valid weight in kilograms.',
-        path: ['weightKg'],
-      });
-    }
-  });
-
-const donorEditProfileSchema = editProfileSchema.superRefine((value, context) => {
-  if (!value.bloodType) {
-    context.addIssue({
-      code: 'custom',
-      message: 'Blood type is required for donors.',
-      path: ['bloodType'],
-    });
-  }
-});
-
-type EditProfileFormValues = z.infer<typeof editProfileSchema>;
 
 type Coordinates = {
   latitude: number | null;
   longitude: number | null;
 };
 
+function EditProfileSection({
+  children,
+  title,
+}: {
+  children: ReactNode;
+  title: string;
+}) {
+  return (
+    <View style={editProfileStyles.section}>
+      <Text style={editProfileStyles.sectionTitle}>{title}</Text>
+      <View style={editProfileStyles.sectionCard}>{children}</View>
+    </View>
+  );
+}
+
+function EditProfileSkeleton({ topInset }: { topInset: number }) {
+  return (
+    <View style={editProfileStyles.screen}>
+      <View style={[editProfileStyles.header, { paddingTop: topInset + 8 }]}>
+        <Skeleton borderRadius={8} height={22} width={22} />
+        <Skeleton borderRadius={8} height={20} width={120} />
+      </View>
+      <View style={editProfileStyles.scrollContent}>
+        <Skeleton borderRadius={999} height={32} width={96} />
+        <View style={editProfileStyles.skeletonCard}>
+          <Skeleton borderRadius={8} height={48} width="100%" />
+          <Skeleton borderRadius={8} height={48} width="100%" />
+        </View>
+        <View style={editProfileStyles.skeletonCard}>
+          <Skeleton borderRadius={8} height={48} width="100%" />
+          <Skeleton borderRadius={8} height={110} width="100%" />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function ContactInfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={editProfileStyles.contactRow}>
+      <Text style={editProfileStyles.contactLabel}>{label}</Text>
+      <Text style={editProfileStyles.contactValue}>{value}</Text>
+    </View>
+  );
+}
+
 export function EditProfileScreen({ navigation }: Props) {
-  const { profile, refreshProfile, session } = useAuth();
+  const { bottom: bottomInset, top: topInset } = useSafeAreaInsets();
+  const { profile, profileLoading, refreshProfile, session } = useAuth();
   const isDonor = profile?.role === 'donor';
-  const [coordinates, setCoordinates] = useState<Coordinates>({
-    latitude: profile?.latitude ?? null,
-    longitude: profile?.longitude ?? null,
-  });
+  const email = session?.user.email?.trim() || null;
+  const phone = profile?.phone?.trim() || session?.user.phone?.trim() || null;
+
+  const initialCoordinates = useMemo<Coordinates>(
+    () => ({
+      latitude: profile?.latitude ?? null,
+      longitude: profile?.longitude ?? null,
+    }),
+    [profile?.latitude, profile?.longitude],
+  );
+
+  const [coordinates, setCoordinates] = useState<Coordinates>(initialCoordinates);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
+
   const {
     control,
     handleSubmit,
     reset,
     setValue,
     watch,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<EditProfileFormValues>({
     defaultValues: {
       address: profile?.address ?? '',
@@ -109,11 +130,14 @@ export function EditProfileScreen({ navigation }: Props) {
     },
     resolver: zodResolver(isDonor ? donorEditProfileSchema : editProfileSchema),
   });
+
   const selectedBloodType = watch('bloodType');
-  const coordinateText =
-    coordinates.latitude !== null && coordinates.longitude !== null
-      ? `Saved coordinates: ${coordinates.latitude.toFixed(5)}, ${coordinates.longitude.toFixed(5)}`
-      : null;
+  const hasCapturedLocation = coordinates.latitude !== null && coordinates.longitude !== null;
+  const coordinatesDirty =
+    coordinates.latitude !== initialCoordinates.latitude ||
+    coordinates.longitude !== initialCoordinates.longitude;
+  const hasUnsavedChanges = isDirty || coordinatesDirty;
+  const { allowExit } = useUnsavedChangesGuard({ enabled: hasUnsavedChanges });
 
   useEffect(() => {
     reset({
@@ -146,8 +170,8 @@ export function EditProfileScreen({ navigation }: Props) {
       if (!permission.granted) {
         setLocationMessage(
           permission.canAskAgain === false
-            ? 'Location permission is disabled. Enable it in settings or continue with address only.'
-            : 'Location permission denied. You can continue with address only.',
+            ? 'Location permission is disabled. Enable it in settings or enter an address manually.'
+            : 'Location permission denied. Enter an address manually.',
         );
         return;
       }
@@ -155,7 +179,7 @@ export function EditProfileScreen({ navigation }: Props) {
       const servicesEnabled = await Location.hasServicesEnabledAsync();
 
       if (!servicesEnabled) {
-        setLocationMessage('Location services are off. Enable them or continue with address only.');
+        setLocationMessage('Location services are off. Enter an address manually.');
         return;
       }
 
@@ -163,13 +187,26 @@ export function EditProfileScreen({ navigation }: Props) {
         accuracy: Location.Accuracy.Balanced,
       });
 
-      setCoordinates({
+      const nextCoordinates = {
         latitude: currentPosition.coords.latitude,
         longitude: currentPosition.coords.longitude,
-      });
-      setLocationMessage('Current location captured.');
+      };
+
+      setCoordinates(nextCoordinates);
+
+      const geocodedPlaces = await Location.reverseGeocodeAsync(nextCoordinates);
+      const formattedAddress = geocodedPlaces[0]
+        ? formatGeocodedAddress(geocodedPlaces[0])
+        : null;
+
+      if (formattedAddress) {
+        setValue('address', formattedAddress, { shouldDirty: true, shouldValidate: true });
+        setLocationMessage('Current location captured and address updated.');
+      } else {
+        setLocationMessage('Current location captured. Add an address if needed.');
+      }
     } catch {
-      setLocationMessage('Unable to capture location. You can continue with address only.');
+      setLocationMessage('Unable to capture location. Enter an address manually.');
     } finally {
       setLocating(false);
     }
@@ -186,7 +223,6 @@ export function EditProfileScreen({ navigation }: Props) {
     }
 
     setError(null);
-    setSuccessMessage(null);
     setLoading(true);
 
     try {
@@ -208,7 +244,7 @@ export function EditProfileScreen({ navigation }: Props) {
       }
 
       await refreshProfile();
-      setSuccessMessage('Profile updated successfully.');
+      allowExit();
       navigation.goBack();
     } catch (submitError) {
       setError(sanitizeProfileError(submitError, 'Unable to save your profile.'));
@@ -217,13 +253,28 @@ export function EditProfileScreen({ navigation }: Props) {
     }
   };
 
+  if (profileLoading && !profile) {
+    return <EditProfileSkeleton topInset={topInset} />;
+  }
+
   if (!profile) {
     return (
-      <View style={profileStyles.screen}>
-        <View style={profileStyles.listContent}>
-          <View style={profileStyles.card}>
-            <Text style={profileStyles.title}>Profile unavailable</Text>
-            <Text style={profileStyles.subtitle}>
+      <View style={editProfileStyles.screen}>
+        <View style={[editProfileStyles.header, { paddingTop: topInset + 8 }]}>
+          <Pressable
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => navigation.goBack()}
+          >
+            <ArrowLeft color={colors.foreground} size={22} />
+          </Pressable>
+          <Text style={editProfileStyles.headerTitle}>Edit Profile</Text>
+        </View>
+        <View style={editProfileStyles.scrollContent}>
+          <View style={editProfileStyles.unavailableCard}>
+            <Text style={editProfileStyles.unavailableTitle}>Profile unavailable</Text>
+            <Text style={editProfileStyles.subtitle}>
               Sign in again or return to your profile to continue editing.
             </Text>
             <PrimaryButton title="Back to profile" onPress={() => navigation.goBack()} />
@@ -234,128 +285,172 @@ export function EditProfileScreen({ navigation }: Props) {
   }
 
   return (
-    <ScrollView contentContainerStyle={profileStyles.listContent} style={profileStyles.screen}>
-      <View style={profileStyles.card}>
-        <Text style={profileStyles.eyebrow}>Edit profile</Text>
-        <Text style={profileStyles.title}>Update your details</Text>
-        <Text style={profileStyles.subtitle}>
-          Only safe profile fields can be changed here. Role and account security settings are
-          protected.
-        </Text>
-        <View style={profileStyles.detailRow}>
-          <Text style={profileStyles.detailLabel}>Role</Text>
-          <Text style={profileStyles.detailValue}>{formatRoleLabel(profile.role)}</Text>
-        </View>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={editProfileStyles.screen}
+    >
+      <View style={[editProfileStyles.header, { paddingTop: topInset + 8 }]}>
+        <Pressable
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={() => navigation.goBack()}
+        >
+          <ArrowLeft color={colors.foreground} size={22} />
+        </Pressable>
+        <Text style={editProfileStyles.headerTitle}>Edit Profile</Text>
       </View>
 
-      <View style={profileStyles.card}>
-        <Controller
-          control={control}
-          name="fullName"
-          render={({ field: { onBlur, onChange, value } }) => (
-            <FormTextInput
-              error={errors.fullName?.message}
-              label="Name"
-              onBlur={onBlur}
-              onChangeText={onChange}
-              placeholder="Juan Dela Cruz"
-              value={value}
-            />
-          )}
-        />
+      <ScrollView
+        contentContainerStyle={editProfileStyles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={editProfileStyles.roleBadge}>
+          <Text style={editProfileStyles.roleBadgeText}>{formatRoleLabel(profile.role)}</Text>
+        </View>
 
-        {isDonor ? (
-          <View style={recipientStyles.optionGroup}>
-            <Text style={profileStyles.detailLabel}>Blood type</Text>
-            <View style={recipientStyles.pillGrid}>
-              {BLOOD_TYPES.map((bloodType) => (
-                <Pressable
-                  key={bloodType}
-                  style={[
-                    recipientStyles.pill,
-                    selectedBloodType === bloodType ? recipientStyles.pillSelected : null,
-                  ]}
-                  onPress={() => setValue('bloodType', bloodType, { shouldValidate: true })}
-                >
-                  <Text
-                    style={[
-                      recipientStyles.pillText,
-                      selectedBloodType === bloodType ? recipientStyles.pillTextSelected : null,
-                    ]}
-                  >
-                    {bloodType}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            {errors.bloodType?.message ? (
-              <Text style={authStyles.error}>{errors.bloodType.message}</Text>
-            ) : null}
-          </View>
-        ) : null}
-
-        <Controller
-          control={control}
-          name="birthdate"
-          render={({ field: { onBlur, onChange, value } }) => (
-            <FormTextInput
-              error={errors.birthdate?.message}
-              keyboardType="numbers-and-punctuation"
-              label="Birthdate"
-              onBlur={onBlur}
-              onChangeText={onChange}
-              placeholder="YYYY-MM-DD"
-              value={value}
-            />
-          )}
-        />
-
-        {isDonor ? (
+        <EditProfileSection title="Personal Information">
           <Controller
             control={control}
-            name="weightKg"
+            name="fullName"
             render={({ field: { onBlur, onChange, value } }) => (
-              <FormTextInput
-                error={errors.weightKg?.message}
-                keyboardType="decimal-pad"
-                label="Weight (kg)"
+              <RequestFormField
+                error={errors.fullName?.message}
+                label="Full Name"
+                placeholder="Enter your full name"
+                value={value}
                 onBlur={onBlur}
                 onChangeText={onChange}
-                placeholder="Optional"
-                value={value}
               />
             )}
           />
+
+          <Controller
+            control={control}
+            name="birthdate"
+            render={({ field: { onChange, value } }) => (
+              <FormDatePicker
+                error={errors.birthdate?.message}
+                label="Birthdate"
+                value={value}
+                onChange={onChange}
+              />
+            )}
+          />
+        </EditProfileSection>
+
+        {isDonor ? (
+          <EditProfileSection title="Donor Details">
+            <BloodTypeSelector
+              error={errors.bloodType?.message}
+              label="Blood Type"
+              value={selectedBloodType}
+              onChange={(bloodType) =>
+                setValue('bloodType', bloodType, { shouldDirty: true, shouldValidate: true })
+              }
+            />
+
+            <Controller
+              control={control}
+              name="weightKg"
+              render={({ field: { onBlur, onChange, value } }) => (
+                <RequestFormField
+                  error={errors.weightKg?.message}
+                  keyboardType="decimal-pad"
+                  label="Weight (kg)"
+                  placeholder={`${MIN_DONOR_WEIGHT_KG}–${MAX_DONOR_WEIGHT_KG} kg`}
+                  value={value}
+                  onBlur={onBlur}
+                  onChangeText={onChange}
+                />
+              )}
+            />
+            <Text style={editProfileStyles.helperText}>
+              Donors must weigh at least {MIN_DONOR_WEIGHT_KG} kg to donate safely.
+            </Text>
+          </EditProfileSection>
         ) : null}
 
-        <Controller
-          control={control}
-          name="address"
-          render={({ field: { onBlur, onChange, value } }) => (
-            <FormTextInput
-              error={errors.address?.message}
-              label="Address"
-              multiline
-              onBlur={onBlur}
-              onChangeText={onChange}
-              placeholder="City, province, nearby landmark"
-              value={value}
-            />
-          )}
-        />
+        <EditProfileSection title="Location">
+          <Controller
+            control={control}
+            name="address"
+            render={({ field: { onBlur, onChange, value } }) => (
+              <RequestFormField
+                error={errors.address?.message}
+                label="Address"
+                leftIcon={
+                  <Pressable
+                    accessibilityLabel="Use current location"
+                    accessibilityRole="button"
+                    disabled={locating}
+                    style={editProfileStyles.locationIcon}
+                    onPress={() => void captureLocation()}
+                  >
+                    {locating ? (
+                      <ActivityIndicator color={colors.mutedLight} size="small" />
+                    ) : (
+                      <MapPin color={colors.mutedLight} size={18} />
+                    )}
+                  </Pressable>
+                }
+                multiline
+                placeholder="City, province, or nearby landmark"
+                value={value}
+                onBlur={onBlur}
+                onChangeText={onChange}
+              />
+            )}
+          />
 
-        <PrimaryButton
-          loading={locating}
-          title="Use current location"
-          variant="secondary"
-          onPress={captureLocation}
-        />
-        {locationMessage ? <Text style={authStyles.helper}>{locationMessage}</Text> : null}
-        {coordinateText ? <Text style={authStyles.helper}>{coordinateText}</Text> : null}
-        {error ? <Text style={authStyles.error}>{error}</Text> : null}
-        {successMessage ? <Text style={authStyles.success}>{successMessage}</Text> : null}
-        <PrimaryButton loading={loading} title="Save changes" onPress={handleSubmit(onSubmit)} />
+          {hasCapturedLocation ? (
+            <View style={editProfileStyles.statusPill}>
+              <Text style={editProfileStyles.statusPillText}>GPS location saved</Text>
+            </View>
+          ) : null}
+          {locationMessage ? (
+            <Text style={editProfileStyles.helperText}>{locationMessage}</Text>
+          ) : null}
+        </EditProfileSection>
+
+        <EditProfileSection title="Contact">
+          {email ? <ContactInfoRow label="Email" value={email} /> : null}
+          {phone ? <ContactInfoRow label="Phone" value={phone} /> : null}
+          {!email && !phone ? (
+            <Text style={editProfileStyles.helperText}>No contact details on file yet.</Text>
+          ) : null}
+          <Text style={editProfileStyles.helperText}>
+            Email and phone are managed through your account settings.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('AccountSettings')}
+          >
+            <Text style={editProfileStyles.contactLink}>Open account settings</Text>
+          </Pressable>
+        </EditProfileSection>
+
+        {error ? <Text style={editProfileStyles.errorText}>{error}</Text> : null}
+      </ScrollView>
+
+      <View style={[editProfileStyles.footer, { paddingBottom: bottomInset + 16 }]}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={loading}
+          style={({ pressed }) => [
+            editProfileStyles.submitButton,
+            loading ? editProfileStyles.submitButtonDisabled : null,
+            pressed && !loading ? editProfileStyles.submitButtonPressed : null,
+          ]}
+          onPress={handleSubmit(onSubmit)}
+        >
+          {loading ? (
+            <ActivityIndicator color={colors.primaryForeground} />
+          ) : (
+            <Text style={editProfileStyles.submitButtonText}>Save Changes</Text>
+          )}
+        </Pressable>
       </View>
-    </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

@@ -1,4 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
 import {
   createContext,
   type PropsWithChildren,
@@ -11,9 +12,16 @@ import {
 } from 'react';
 
 import { supabase } from '@/services/supabase/client';
+import { parseAuthTokensFromUrl } from '@/utils/authRedirect';
+import {
+  getBloodbankVerification,
+  type BloodbankVerification,
+} from '@/services/supabase/bloodbankVerifications';
+import { prefetchProfileAvatar } from '@/services/supabase/profileAvatar';
 import {
   getProfile,
-  isProfileComplete,
+  isDonorRecipientProfileComplete,
+  syncProfileFromAuthUser,
   type Profile,
 } from '@/services/supabase/profiles';
 import { sanitizeAuthError } from '@/utils/authErrors';
@@ -21,7 +29,9 @@ import { sanitizeAuthError } from '@/utils/authErrors';
 type AuthContextValue = {
   authError: string | null;
   authRetrying: boolean;
+  bloodbankVerification: BloodbankVerification | null;
   initializing: boolean;
+  profileLoading: boolean;
   session: Session | null;
   profile: Profile;
   profileComplete: boolean;
@@ -35,12 +45,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [initializing, setInitializing] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile>(null);
+  const [bloodbankVerification, setBloodbankVerification] =
+    useState<BloodbankVerification | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authRetrying, setAuthRetrying] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
   const mountedRef = useRef(false);
   const profileRequestIdRef = useRef(0);
 
-  const loadProfile = useCallback(async (activeSession: Session | null) => {
+  const loadProfile = useCallback(
+    async (activeSession: Session | null, options?: { background?: boolean }) => {
     const requestId = profileRequestIdRef.current + 1;
     profileRequestIdRef.current = requestId;
     const applyProfileState = (update: () => void) => {
@@ -52,32 +66,77 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (!activeSession?.user.id) {
       applyProfileState(() => {
         setProfile(null);
+        setBloodbankVerification(null);
         setAuthError(null);
+        setProfileLoading(false);
       });
       return;
     }
 
-    try {
-      const { data, error } = await getProfile(activeSession.user.id);
+    if (!options?.background) {
+      applyProfileState(() => {
+        setProfileLoading(true);
+      });
+    }
 
-      if (error) {
-        throw error;
+    try {
+      const { data: syncedProfile, error: syncError } = await syncProfileFromAuthUser(
+        activeSession.user,
+      );
+
+      if (syncError) {
+        throw syncError;
+      }
+
+      let resolvedProfile = syncedProfile;
+
+      if (!resolvedProfile) {
+        const { data, error } = await getProfile(activeSession.user.id);
+
+        if (error) {
+          throw error;
+        }
+
+        resolvedProfile = data;
+      }
+
+      let verification: BloodbankVerification | null = null;
+
+      if (resolvedProfile?.role === 'bloodbank') {
+        const { data: verificationData, error: verificationError } =
+          await getBloodbankVerification(activeSession.user.id);
+
+        if (verificationError) {
+          throw verificationError;
+        }
+
+        verification = verificationData;
       }
 
       applyProfileState(() => {
-        setProfile(data);
+        setProfile(resolvedProfile);
+        setBloodbankVerification(verification);
         setAuthError(null);
+        setProfileLoading(false);
       });
+
+      if (resolvedProfile?.avatar_path) {
+        void prefetchProfileAvatar(resolvedProfile.avatar_path);
+      }
     } catch (error) {
       applyProfileState(() => {
         setProfile(null);
+        setBloodbankVerification(null);
         setAuthError(sanitizeAuthError(error, 'Unable to load your profile.'));
+        setProfileLoading(false);
       });
     }
-  }, []);
+  },
+    [],
+  );
 
   const refreshProfile = useCallback(async () => {
-    await loadProfile(session);
+    await loadProfile(session, { background: true });
   }, [loadProfile, session]);
 
   const retryAuth = useCallback(async () => {
@@ -130,7 +189,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
         }
 
         setSession(data.session);
-        await loadProfile(data.session);
       } catch (error) {
         if (mountedRef.current) {
           setSession(null);
@@ -149,22 +207,21 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      const applySession = async () => {
-        if (!mountedRef.current) {
-          return;
-        }
+      if (!mountedRef.current) {
+        return;
+      }
 
-        try {
-          setSession(nextSession);
-          await loadProfile(nextSession);
-        } finally {
-          if (mountedRef.current) {
-            setInitializing(false);
-          }
-        }
-      };
+      setSession(nextSession);
+      setInitializing(false);
 
-      void applySession();
+      if (nextSession) {
+        void loadProfile(nextSession);
+      } else {
+        setProfile(null);
+        setBloodbankVerification(null);
+        setAuthError(null);
+        setProfileLoading(false);
+      }
     });
 
     return () => {
@@ -172,20 +229,80 @@ export function AuthProvider({ children }: PropsWithChildren) {
       profileRequestIdRef.current += 1;
       subscription.unsubscribe();
     };
-  }, [loadProfile]);
+  }, []);
+
+  useEffect(() => {
+    if (initializing) {
+      return;
+    }
+
+    void loadProfile(session);
+  }, [initializing, loadProfile, session]);
+
+  useEffect(() => {
+    const activateSessionFromUrl = async (url: string | null) => {
+      if (!url) {
+        return;
+      }
+
+      const tokens = parseAuthTokensFromUrl(url);
+
+      if (!tokens) {
+        return;
+      }
+
+      await supabase.auth.setSession({
+        access_token: tokens.accessToken,
+        refresh_token: tokens.refreshToken,
+      });
+    };
+
+    void Linking.getInitialURL().then(activateSessionFromUrl);
+
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      void activateSessionFromUrl(url);
+    });
+
+    return () => subscription.remove();
+  }, []);
+
+  const profileComplete = useMemo(() => {
+    if (!profile) {
+      return false;
+    }
+
+    if (profile.role === 'bloodbank') {
+      return Boolean(bloodbankVerification);
+    }
+
+    return isDonorRecipientProfileComplete(profile);
+  }, [bloodbankVerification, profile]);
 
   const value = useMemo(
     () => ({
       authError,
       authRetrying,
+      bloodbankVerification,
       initializing,
       profile,
-      profileComplete: isProfileComplete(profile),
+      profileComplete,
+      profileLoading,
       refreshProfile,
       retryAuth,
       session,
     }),
-    [authError, authRetrying, initializing, profile, refreshProfile, retryAuth, session],
+    [
+      authError,
+      authRetrying,
+      bloodbankVerification,
+      initializing,
+      profile,
+      profileComplete,
+      profileLoading,
+      refreshProfile,
+      retryAuth,
+      session,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
