@@ -48,3 +48,7 @@ env
 /android
 
 supabase/.temp/
+
+# Local AI editor/assistant configuration
+.claude/
+.cursor/
