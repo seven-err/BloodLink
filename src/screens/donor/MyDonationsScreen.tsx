@@ -157,7 +157,7 @@ export function MyDonationsScreen({ navigation }: Props) {
           </Text>
           <PrimaryButton
             title="Browse open requests"
-            onPress={() => navigation.navigate('DonorTabs', { screen: 'DonorRequestFeed' })}
+            onPress={() => navigation.navigate('AppTabs', { screen: 'Requests' })}
           />
         </View>
       ) : (

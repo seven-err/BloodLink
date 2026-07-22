@@ -4,6 +4,7 @@ import MapView, { Marker, PROVIDER_GOOGLE, type MapType, type Region } from 'rea
 
 import { MapStyleToggle } from '@/components/map/MapStyleToggle';
 import { mapStyles } from '@/components/map/styles';
+import { colors, radii } from '@/constants/theme';
 import { getMapAttribution, type MapViewMode } from '@/constants/mapTiles';
 import type { Coordinates } from '@/services/location/types';
 
@@ -22,6 +23,8 @@ type OpenStreetMapViewProps = {
   onMarkerPress?: (markerId: string) => void;
   selectedMarkerId?: string | null;
   height?: number;
+  /** Bump to re-animate the camera (refresh / recenter) even if region values are unchanged. */
+  focusToken?: number;
   mapMode?: MapViewMode;
   onMapModeChange?: (mode: MapViewMode) => void;
   showStyleToggle?: boolean;
@@ -44,6 +47,7 @@ export function OpenStreetMapView({
   onMarkerPress,
   selectedMarkerId = null,
   height = DEFAULT_MAP_HEIGHT,
+  focusToken = 0,
   mapMode: mapModeProp,
   onMapModeChange,
   showStyleToggle = true,
@@ -80,7 +84,7 @@ export function OpenStreetMapView({
 
   useEffect(() => {
     mapRef.current?.animateToRegion(region, 280);
-  }, [region]);
+  }, [focusToken, region]);
 
   return (
     <View style={containerStyle}>
@@ -102,7 +106,10 @@ export function OpenStreetMapView({
             key={marker.id}
             coordinate={marker.coordinates}
             description={marker.description}
-            pinColor={marker.pinColor ?? (selectedMarkerId === marker.id ? '#b91c1c' : '#e50914')}
+            pinColor={
+              marker.pinColor ??
+              (selectedMarkerId === marker.id ? colors.primaryDark : colors.primary)
+            }
             title={marker.title}
             onPress={() => onMarkerPress?.(marker.id)}
           />
@@ -124,6 +131,6 @@ export function OpenStreetMapView({
 
 const styles = StyleSheet.create({
   mapSurface: {
-    borderRadius: 16,
+    borderRadius: radii.card,
   },
 });

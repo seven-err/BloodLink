@@ -4,17 +4,19 @@ import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Bell, Clock, Droplet, Users } from 'lucide-react-native';
-import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BloodTypeBadge } from '@/components/bloodRequest/BloodTypeBadge';
 import { DonorStatCard } from '@/components/donor/DonorStatCard';
 import { UrgentRequestCard } from '@/components/donor/UrgentRequestCard';
+import { ModeToggle } from '@/components/common/ModeToggle';
+import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { Skeleton } from '@/components/common/Skeleton';
 import { HemieFloatingButton } from '@/components/hemie/HemieFloatingButton';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import type { DonorTabParamList } from '@/navigation/DonorTabNavigator';
+import type { AppTabParamList } from '@/navigation/AppTabNavigator';
 import type { AppStackParamList } from '@/navigation/types';
 import { donorHomeStyles } from '@/screens/donor/donorHomeStyles';
 import { listDonorVerifiableItems } from '@/services/supabase/donations';
@@ -35,7 +37,7 @@ import { formatRelativeTime } from '@/utils/relativeTime';
 import { sanitizeProfileError } from '@/utils/profileErrors';
 
 type Props = CompositeScreenProps<
-  BottomTabScreenProps<DonorTabParamList, 'DonorHome'>,
+  BottomTabScreenProps<AppTabParamList, 'Home'>,
   NativeStackScreenProps<AppStackParamList>
 >;
 
@@ -58,8 +60,14 @@ function DonorHomeSkeleton({ topInset }: { topInset: number }) {
   return (
     <View style={donorHomeStyles.screen}>
       <View style={[donorHomeStyles.header, { paddingTop: topInset + 8 }]}>
-        <Skeleton height={28} width="55%" />
-        <Skeleton height={16} style={{ marginTop: 8 }} width="30%" />
+        <View style={donorHomeStyles.headerRow}>
+          <View style={{ flex: 1, gap: 8 }}>
+            <Skeleton height={28} width="70%" />
+            <Skeleton height={16} width="40%" />
+          </View>
+          <Skeleton borderRadius={999} height={40} width={40} />
+        </View>
+        <Skeleton borderRadius={999} height={42} style={donorHomeStyles.modeToggleRow} width="100%" />
       </View>
       <View style={[donorHomeStyles.scrollContent, { paddingTop: 24 }]}>
         <Skeleton borderRadius={16} height={76} width="100%" />
@@ -88,6 +96,8 @@ export function DonorHomeScreen({ navigation }: Props) {
   const [verificationActive, setVerificationActive] = useState(false);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [availabilityOverride, setAvailabilityOverride] = useState<boolean | null>(null);
 
   const firstName = getFirstName(profile?.full_name);
@@ -141,17 +151,19 @@ export function DonorHomeScreen({ navigation }: Props) {
       });
   }, [profile?.latitude, profile?.longitude, requests]);
 
-  const loadHomeData = useCallback(async () => {
+  const loadHomeData = useCallback(async (isRefresh = false) => {
     if (!session?.user.id) {
       setInitialLoading(false);
       return;
     }
 
-    if (!hasLoadedOnceRef.current) {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else if (!hasLoadedOnceRef.current) {
       setInitialLoading(true);
     }
 
-    setAvailabilityError(null);
+    setLoadError(null);
 
     try {
       const [
@@ -200,10 +212,11 @@ export function DonorHomeScreen({ navigation }: Props) {
       setHasUnreadNotifications(
         (notificationsResult.data ?? []).some((notification) => notification.read_at === null),
       );
-    } catch (loadError) {
-      setAvailabilityError(sanitizeProfileError(loadError, 'Unable to load donor home data.'));
+    } catch (error) {
+      setLoadError(sanitizeProfileError(error, 'Unable to load donor home data.'));
     } finally {
       setInitialLoading(false);
+      setRefreshing(false);
       hasLoadedOnceRef.current = true;
     }
   }, [session?.user.id]);
@@ -274,9 +287,17 @@ export function DonorHomeScreen({ navigation }: Props) {
             {hasUnreadNotifications ? <View style={donorHomeStyles.notificationDot} /> : null}
           </Pressable>
         </View>
+        <View style={donorHomeStyles.modeToggleRow}>
+          <ModeToggle showHint />
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={donorHomeStyles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={donorHomeStyles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => void loadHomeData(true)} />
+        }
+      >
         <View style={donorHomeStyles.availabilityCard}>
           <View style={donorHomeStyles.availabilityIcon}>
             <Droplet color={colors.mutedLight} size={22} />
@@ -288,9 +309,11 @@ export function DonorHomeScreen({ navigation }: Props) {
             </Text>
           </View>
           <Switch
+            accessibilityLabel="Donation availability"
+            accessibilityState={{ checked: isAvailable, disabled: availabilityLoading }}
             disabled={availabilityLoading}
-            thumbColor="#fff"
-            trackColor={{ false: '#d1d5db', true: colors.primary }}
+            thumbColor={colors.primaryForeground}
+            trackColor={{ false: colors.border, true: colors.primary }}
             value={isAvailable}
             onValueChange={(value) => {
               void handleAvailabilityToggle(value);
@@ -304,6 +327,12 @@ export function DonorHomeScreen({ navigation }: Props) {
         ) : null}
         {availabilityError ? (
           <Text style={donorHomeStyles.availabilityError}>{availabilityError}</Text>
+        ) : null}
+        {loadError ? (
+          <View style={donorHomeStyles.loadErrorCard}>
+            <Text style={donorHomeStyles.availabilityError}>{loadError}</Text>
+            <PrimaryButton title="Try again" onPress={() => void loadHomeData()} />
+          </View>
         ) : null}
 
         {profile?.blood_type ? (
@@ -321,6 +350,7 @@ export function DonorHomeScreen({ navigation }: Props) {
             <View style={donorHomeStyles.bloodTypeFooter}>
               <View />
               <Pressable
+                accessibilityLabel="View profile details"
                 accessibilityRole="button"
                 onPress={() => navigation.navigate('AppProfile')}
               >
@@ -349,9 +379,10 @@ export function DonorHomeScreen({ navigation }: Props) {
         <View style={donorHomeStyles.sectionHeader}>
           <Text style={donorHomeStyles.sectionTitle}>Urgent Requests Nearby</Text>
           <Pressable
+            accessibilityLabel="View all blood requests"
             accessibilityRole="button"
             style={donorHomeStyles.viewAllButton}
-            onPress={() => navigation.navigate('DonorRequestFeed')}
+            onPress={() => navigation.navigate('Requests')}
           >
             <Text style={donorHomeStyles.linkText}>View All</Text>
           </Pressable>
@@ -361,7 +392,7 @@ export function DonorHomeScreen({ navigation }: Props) {
           {urgentRequests.length === 0 ? (
             <View style={donorHomeStyles.bloodTypeCard}>
               <Text style={donorHomeStyles.bloodTypeMeta}>
-                No urgent requests nearby right now. Pull to refresh later or browse all open
+                No urgent requests nearby right now. Pull down to refresh or browse all open
                 requests.
               </Text>
             </View>

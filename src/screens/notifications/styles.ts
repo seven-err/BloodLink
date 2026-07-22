@@ -18,7 +18,7 @@ export const notificationStyles = StyleSheet.create({
     textAlign: 'center',
   },
   filterContainer: {
-    backgroundColor: '#eef2f7',
+    backgroundColor: colors.background,
     borderRadius: radii.pill,
     flexDirection: 'row',
     gap: 4,
@@ -53,7 +53,7 @@ export const notificationStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingBottom: 14,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 8,
   },
   headerAction: {
@@ -74,7 +74,7 @@ export const notificationStyles = StyleSheet.create({
   },
   listContent: {
     gap: 12,
-    padding: 20,
+    padding: 24,
     paddingBottom: 32,
   },
   screen: {

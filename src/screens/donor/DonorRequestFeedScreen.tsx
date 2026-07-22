@@ -19,7 +19,7 @@ import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { Skeleton } from '@/components/common/Skeleton';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import type { DonorTabParamList } from '@/navigation/DonorTabNavigator';
+import type { AppTabParamList } from '@/navigation/AppTabNavigator';
 import type { AppStackParamList } from '@/navigation/types';
 import { donorRequestFeedStyles } from '@/screens/donor/donorRequestFeedStyles';
 import {
@@ -31,7 +31,7 @@ import { haversineDistanceMeters } from '@/utils/coordinates';
 import { formatRelativeTime } from '@/utils/relativeTime';
 
 type Props = CompositeScreenProps<
-  BottomTabScreenProps<DonorTabParamList, 'DonorRequestFeed'>,
+  BottomTabScreenProps<AppTabParamList, 'Requests'>,
   NativeStackScreenProps<AppStackParamList>
 >;
 
@@ -274,30 +274,17 @@ export function DonorRequestFeedScreen({ navigation }: Props) {
     <View style={donorRequestFeedStyles.screen}>
       <View style={[donorRequestFeedStyles.header, { paddingTop: topInset + 8 }]}>
         <Text style={[donorRequestFeedStyles.headerTitle, { flex: 1 }]}>Blood Requests</Text>
-        <View style={donorRequestFeedStyles.headerActions}>
-          <Pressable
-            accessibilityLabel="View nearby donors map"
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              donorRequestFeedStyles.mapLinkButton,
-              pressed ? donorRequestFeedStyles.mapLinkButtonPressed : null,
-            ]}
-            onPress={() => navigation.navigate('DonorOpenRequestsMap')}
-          >
-            <Map color={colors.primaryDark} size={18} strokeWidth={2} />
-          </Pressable>
-          <Pressable
-            accessibilityLabel="Create blood request"
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              donorRequestFeedStyles.createButton,
-              pressed ? donorRequestFeedStyles.createButtonPressed : null,
-            ]}
-            onPress={() => navigation.getParent()?.navigate('CreateBloodRequest')}
-          >
-            <Text style={donorRequestFeedStyles.createButtonText}>+ Create</Text>
-          </Pressable>
-        </View>
+        <Pressable
+          accessibilityLabel="View nearby donors map"
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            donorRequestFeedStyles.mapLinkButton,
+            pressed ? donorRequestFeedStyles.mapLinkButtonPressed : null,
+          ]}
+          onPress={() => navigation.navigate('Map')}
+        >
+          <Map color={colors.primaryDark} size={18} strokeWidth={2} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -324,6 +311,11 @@ export function DonorRequestFeedScreen({ navigation }: Props) {
               />
             </View>
             <Pressable
+              accessibilityLabel={
+                activeFilter === 'compatible'
+                  ? 'Show all requests'
+                  : 'Show compatible requests only'
+              }
               accessibilityRole="button"
               style={({ pressed }) => [
                 donorRequestFeedStyles.filterButton,
@@ -370,7 +362,7 @@ export function DonorRequestFeedScreen({ navigation }: Props) {
 
           <Pressable
             accessibilityRole="button"
-            onPress={() => navigation.navigate('DonorOpenRequestsMap')}
+            onPress={() => navigation.navigate('Map')}
           >
             <Text style={donorRequestFeedStyles.mapTextLink}>View nearby donors on map</Text>
           </Pressable>

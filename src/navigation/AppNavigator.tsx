@@ -1,26 +1,24 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import { DonorTabNavigator } from '@/navigation/DonorTabNavigator';
-import { RecipientTabNavigator } from '@/navigation/RecipientTabNavigator';
+import { AppTabNavigator } from '@/navigation/AppTabNavigator';
 import type { AppStackParamList } from '@/navigation/types';
 import { DonationQrScreen } from '@/screens/donor/DonationQrScreen';
 import { DonorRequestDetailScreen } from '@/screens/donor/DonorRequestDetailScreen';
 import { MyDonationsScreen } from '@/screens/donor/MyDonationsScreen';
+import { NearbyDonorDetailScreen } from '@/screens/donor/NearbyDonorDetailScreen';
 import { HemieAIScreen } from '@/screens/hemie/HemieAIScreen';
 import { EditProfileScreen } from '@/screens/profile/EditProfileScreen';
 import { AccountSettingsScreen } from '@/screens/profile/AccountSettingsScreen';
 import { ProfilePictureScreen } from '@/screens/profile/ProfilePictureScreen';
 import { SettingsDetailScreen } from '@/screens/profile/SettingsDetailScreen';
 import { SettingsScreen } from '@/screens/profile/SettingsScreen';
-import { UserProfileScreen } from '@/screens/profile/UserProfileScreen';
 import { BloodRequestDetailScreen } from '@/screens/recipient/BloodRequestDetailScreen';
 import { CreateBloodRequestScreen } from '@/screens/recipient/CreateBloodRequestScreen';
 import { MyBloodRequestsScreen } from '@/screens/recipient/MyBloodRequestsScreen';
 import { ChatThreadScreen } from '@/screens/ChatThreadScreen';
 import { NotificationsScreen } from '@/screens/NotificationsScreen';
-import { NearbyDonorDetailScreen } from '@/screens/donor/NearbyDonorDetailScreen';
-import { NearbyDonorsMapScreen } from '@/screens/donor/NearbyDonorsMapScreen';
 import { RestrictedAccessScreen } from '@/screens/RestrictedAccessScreen';
 import { isMobileAppRole } from '@/utils/roles';
 
@@ -33,13 +31,9 @@ export function AppNavigator() {
     return <RestrictedAccessScreen />;
   }
 
-  const isDonor = !profile || profile.role === 'donor';
-  const initialRouteName = isDonor ? 'DonorTabs' : 'RecipientTabs';
-
   return (
     <Stack.Navigator
-      key={initialRouteName}
-      initialRouteName={initialRouteName}
+      initialRouteName="AppTabs"
       screenOptions={{
         contentStyle: {
           backgroundColor: colors.background,
@@ -49,24 +43,14 @@ export function AppNavigator() {
       }}
     >
       <Stack.Screen
-        component={DonorTabNavigator}
-        name="DonorTabs"
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        component={RecipientTabNavigator}
-        name="RecipientTabs"
+        component={AppTabNavigator}
+        name="AppTabs"
         options={{ headerShown: false }}
       />
       <Stack.Screen
         component={HemieAIScreen}
         name="HemieAI"
         options={{ headerShown: false, presentation: 'card' }}
-      />
-      <Stack.Screen
-        component={UserProfileScreen}
-        name="AppProfile"
-        options={{ title: 'Profile' }}
       />
       <Stack.Screen
         component={EditProfileScreen}
@@ -131,11 +115,6 @@ export function AppNavigator() {
       <Stack.Screen
         component={NotificationsScreen}
         name="Notifications"
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        component={NearbyDonorsMapScreen}
-        name="NearbyDonorsMap"
         options={{ headerShown: false }}
       />
       <Stack.Screen

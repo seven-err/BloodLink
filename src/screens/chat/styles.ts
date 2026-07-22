@@ -9,7 +9,7 @@ export const chatStyles = StyleSheet.create({
   },
   chatContent: {
     gap: 8,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 12,
   },
   composerDock: {
@@ -18,7 +18,7 @@ export const chatStyles = StyleSheet.create({
     borderTopWidth: 1,
     bottom: 0,
     left: 0,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 10,
     position: 'absolute',
     right: 0,
@@ -62,7 +62,7 @@ export const chatStyles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     paddingBottom: 14,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
   },
   headerCopy: {
     flex: 1,
@@ -87,7 +87,7 @@ export const chatStyles = StyleSheet.create({
     fontWeight: '800',
   },
   inlineError: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     textAlign: 'center',
   },
   input: {

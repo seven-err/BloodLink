@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors } from '@/constants/theme';
+import { colors, radii } from '@/constants/theme';
 
 type RoleSelectionCardProps = {
   description: string;
@@ -15,13 +15,15 @@ type RoleSelectionCardProps = {
 export function RoleSelectionCard({
   description,
   icon,
-  iconBackground = '#fee2e2',
+  iconBackground = colors.primarySoft,
   onPress,
   selected,
   title,
 }: RoleSelectionCardProps) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
       style={[styles.card, selected ? styles.cardSelected : null]}
       onPress={onPress}
     >
@@ -37,9 +39,9 @@ export function RoleSelectionCard({
 const styles = StyleSheet.create({
   card: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: '#e5e7eb',
-    borderRadius: 16,
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: radii.card,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 16,
@@ -53,7 +55,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   description: {
-    color: '#6b7280',
+    color: colors.mutedLight,
     fontSize: 14,
     lineHeight: 20,
   },
@@ -65,7 +67,7 @@ const styles = StyleSheet.create({
     width: 48,
   },
   title: {
-    color: '#111827',
+    color: colors.foreground,
     fontSize: 16,
     fontWeight: '700',
   },

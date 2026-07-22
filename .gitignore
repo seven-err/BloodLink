@@ -52,3 +52,4 @@ supabase/.temp/
 # Local AI editor/assistant configuration
 .claude/
 .cursor/
+.AGENTS/

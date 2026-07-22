@@ -1,5 +1,7 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 
+import { colors } from '@/constants/theme';
+
 type SocialButtonProps = {
   icon: React.ReactNode;
   title: string;
@@ -8,7 +10,12 @@ type SocialButtonProps = {
 
 export function SocialButton({ icon, title, onPress }: SocialButtonProps) {
   return (
-    <Pressable style={styles.button} onPress={onPress}>
+    <Pressable
+      accessibilityLabel={title}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.button, pressed ? styles.buttonPressed : null]}
+      onPress={onPress}
+    >
       {icon}
       <Text style={styles.title}>{title}</Text>
     </Pressable>
@@ -18,8 +25,8 @@ export function SocialButton({ icon, title, onPress }: SocialButtonProps) {
 const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderColor: '#e5e7eb',
+    backgroundColor: colors.card,
+    borderColor: colors.border,
     borderRadius: 12,
     borderWidth: 1,
     flexDirection: 'row',
@@ -28,8 +35,11 @@ const styles = StyleSheet.create({
     minHeight: 56,
     width: '100%',
   },
+  buttonPressed: {
+    opacity: 0.92,
+  },
   title: {
-    color: '#1f2937',
+    color: colors.foreground,
     fontSize: 15,
     fontWeight: '600',
   },

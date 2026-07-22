@@ -1,99 +1,8 @@
 import { StyleSheet } from 'react-native';
 
+import { colors, radii } from '@/constants/theme';
+
 export const mapStyles = StyleSheet.create({
-  calloutCard: {
-    gap: 4,
-    maxWidth: 220,
-    padding: 4,
-  },
-  calloutMeta: {
-    color: '#6b7280',
-    fontSize: 13,
-  },
-  calloutTitle: {
-    color: '#991b1b',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  map: {
-    flex: 1,
-  },
-  mapContainer: {
-    borderColor: '#fecaca',
-    borderRadius: 16,
-    borderWidth: 1,
-    minHeight: 220,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  mapFallback: {
-    alignItems: 'center',
-    backgroundColor: '#fff7f7',
-    flex: 1,
-    gap: 8,
-    justifyContent: 'center',
-    minHeight: 220,
-    padding: 16,
-  },
-  mapFallbackText: {
-    color: '#4b5563',
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  overlay: {
-    backgroundColor: 'rgba(255, 247, 247, 0.96)',
-    gap: 12,
-    left: 0,
-    padding: 20,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    zIndex: 2,
-  },
-  overlayBottom: {
-    backgroundColor: '#fff',
-    borderColor: '#fecaca',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,
-    bottom: 0,
-    gap: 8,
-    left: 0,
-    padding: 16,
-    position: 'absolute',
-    right: 0,
-    zIndex: 2,
-  },
-  overlayTitle: {
-    color: '#991b1b',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  permissionBanner: {
-    backgroundColor: '#fff7f7',
-    borderColor: '#fecaca',
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 6,
-    margin: 12,
-    padding: 12,
-  },
-  permissionText: {
-    color: '#4b5563',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  screen: {
-    backgroundColor: '#fef2f2',
-    flex: 1,
-  },
-  styleToggle: {
-    position: 'absolute',
-    right: 10,
-    top: 10,
-    zIndex: 3,
-  },
   attributionBar: {
     backgroundColor: 'rgba(255, 255, 255, 0.92)',
     bottom: 0,
@@ -105,9 +14,23 @@ export const mapStyles = StyleSheet.create({
     zIndex: 2,
   },
   attributionText: {
-    color: '#6b7280',
+    color: colors.mutedLight,
     fontSize: 9,
     lineHeight: 12,
     textAlign: 'center',
+  },
+  mapContainer: {
+    borderColor: colors.borderAccent,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    minHeight: 220,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  styleToggle: {
+    position: 'absolute',
+    right: 10,
+    top: 10,
+    zIndex: 3,
   },
 });

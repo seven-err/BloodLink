@@ -1,27 +1,28 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { FileText, Home, Map, MessageCircle, User } from 'lucide-react-native';
-import { colors } from '@/constants/theme';
-import { NearbyDonorsMapScreen } from '@/screens/donor/NearbyDonorsMapScreen';
-import { MessagesScreen } from '@/screens/messages/MessagesScreen';
-import { UserProfileScreen } from '@/screens/profile/UserProfileScreen';
-import { MyBloodRequestsScreen } from '@/screens/recipient/MyBloodRequestsScreen';
-import { RecipientHomeScreen } from '@/screens/recipient/RecipientHomeScreen';
 
-export type RecipientTabParamList = {
-  RecipientHome: undefined;
-  RecipientRequests: undefined;
-  RecipientMap: undefined;
-  RecipientMessages: undefined;
+import { colors } from '@/constants/theme';
+import { MessagesScreen } from '@/screens/messages/MessagesScreen';
+import { NearbyDonorsMapScreen } from '@/screens/donor/NearbyDonorsMapScreen';
+import { ModeHomeScreen } from '@/screens/ModeHomeScreen';
+import { ModeRequestsScreen } from '@/screens/ModeRequestsScreen';
+import { UserProfileScreen } from '@/screens/profile/UserProfileScreen';
+
+export type AppTabParamList = {
+  Home: undefined;
+  Requests: undefined;
+  Map: undefined;
+  Chat: undefined;
   AppProfile: undefined;
 };
 
-const Tab = createBottomTabNavigator<RecipientTabParamList>();
+const Tab = createBottomTabNavigator<AppTabParamList>();
 
 const tabIcon =
   (Icon: typeof Home) =>
   ({ color, size }: { color: string; size: number }) => <Icon color={color} size={size} />;
 
-export function RecipientTabNavigator() {
+export function AppTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -47,8 +48,8 @@ export function RecipientTabNavigator() {
       }}
     >
       <Tab.Screen
-        component={RecipientHomeScreen}
-        name="RecipientHome"
+        component={ModeHomeScreen}
+        name="Home"
         options={{
           headerShown: false,
           tabBarIcon: tabIcon(Home),
@@ -56,8 +57,8 @@ export function RecipientTabNavigator() {
         }}
       />
       <Tab.Screen
-        component={MyBloodRequestsScreen}
-        name="RecipientRequests"
+        component={ModeRequestsScreen}
+        name="Requests"
         options={{
           headerShown: false,
           tabBarIcon: tabIcon(FileText),
@@ -66,7 +67,7 @@ export function RecipientTabNavigator() {
       />
       <Tab.Screen
         component={NearbyDonorsMapScreen}
-        name="RecipientMap"
+        name="Map"
         options={{
           headerShown: false,
           tabBarIcon: tabIcon(Map),
@@ -75,7 +76,7 @@ export function RecipientTabNavigator() {
       />
       <Tab.Screen
         component={MessagesScreen}
-        name="RecipientMessages"
+        name="Chat"
         options={{
           headerShown: false,
           tabBarIcon: tabIcon(MessageCircle),

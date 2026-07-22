@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View } f
 
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { OtpInput } from '@/components/forms/OtpInput';
+import { colors } from '@/constants/theme';
 import type { AuthStackParamList } from '@/navigation/types';
 import { bypassPhoneAuth } from '@/services/supabase/auth';
 import { formatPhoneDisplay } from '@/utils/phone';
@@ -128,17 +129,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   instruction: {
-    color: '#6b7280',
+    color: colors.mutedLight,
     fontSize: 16,
     lineHeight: 24,
     textAlign: 'center',
   },
   phone: {
-    color: '#202124',
+    color: colors.foreground,
     fontWeight: '700',
   },
   resendLink: {
-    color: '#e50914',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
@@ -148,12 +149,12 @@ const styles = StyleSheet.create({
     marginTop: -8,
   },
   resendTimer: {
-    color: '#9ca3af',
+    color: colors.mutedLight,
     fontSize: 14,
     textAlign: 'center',
   },
   screen: {
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.background,
     flex: 1,
   },
 });

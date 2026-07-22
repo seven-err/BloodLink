@@ -28,7 +28,7 @@ export type DonorVerificationStatus =
 
 export type BloodbankVerificationStatus = 'pending' | 'approved' | 'rejected';
 
-export type OnboardingRole = Extract<UserRole, 'donor' | 'recipient' | 'bloodbank'>;
+export type OnboardingRole = Extract<UserRole, 'donor' | 'recipient'>;
 
 export type DonorMatchStatus =
   | 'pending'
@@ -308,6 +308,44 @@ export type Database = {
           read_at?: string | null;
         };
         Update: Partial<Database['public']['Tables']['notifications']['Insert']>;
+        Relationships: [];
+      };
+      notification_preferences: {
+        Row: {
+          user_id: string;
+          push_enabled: boolean;
+          emergency_alerts: boolean;
+          message_notifications: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          push_enabled?: boolean;
+          emergency_alerts?: boolean;
+          message_notifications?: boolean;
+        };
+        Update: Partial<
+          Database['public']['Tables']['notification_preferences']['Insert']
+        >;
+        Relationships: [];
+      };
+      push_tokens: {
+        Row: {
+          id: string;
+          user_id: string;
+          token: string;
+          platform: 'ios' | 'android' | 'web';
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          token: string;
+          platform: 'ios' | 'android' | 'web';
+        };
+        Update: Partial<Database['public']['Tables']['push_tokens']['Insert']>;
         Relationships: [];
       };
       messages: {

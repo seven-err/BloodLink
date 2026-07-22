@@ -4,6 +4,7 @@ import { colors, radii } from '@/constants/theme';
 
 export const messagesStyles = StyleSheet.create({
   emptyCard: {
+    gap: 16,
     marginHorizontal: 24,
     marginTop: 16,
     padding: 20,

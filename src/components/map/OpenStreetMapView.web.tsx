@@ -23,6 +23,8 @@ type OpenStreetMapViewProps = {
   onMarkerPress?: (markerId: string) => void;
   selectedMarkerId?: string | null;
   height?: number;
+  /** Accepted for API parity with native; web remounts via region srcDoc. */
+  focusToken?: number;
   mapMode?: MapViewMode;
   onMapModeChange?: (mode: MapViewMode) => void;
   showStyleToggle?: boolean;

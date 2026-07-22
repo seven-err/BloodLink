@@ -4,10 +4,17 @@ const crypto = require('crypto');
 const cors = require('cors');
 const express = require('express');
 const nodemailer = require('nodemailer');
+const {
+  generateHemieReply,
+  sanitizeContext,
+  sanitizeMessages,
+  verifySupabaseAccessToken,
+} = require('./hemieChat');
 
 const port = Number(process.env.PORT || 3001);
 const DEFAULT_RATE_LIMIT_MAX = 30;
 const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
+const DEFAULT_HEMIE_RATE_LIMIT_MAX = 40;
 const MIN_API_KEY_LENGTH = 16;
 
 const emailTemplates = {
@@ -66,7 +73,11 @@ function timingSafeEqualString(value, expected) {
   );
 }
 
-function createRateLimiter({ max = DEFAULT_RATE_LIMIT_MAX, windowMs = DEFAULT_RATE_LIMIT_WINDOW_MS } = {}) {
+function createRateLimiter({
+  max = DEFAULT_RATE_LIMIT_MAX,
+  windowMs = DEFAULT_RATE_LIMIT_WINDOW_MS,
+  message = 'Too many email requests. Try again later.',
+} = {}) {
   const buckets = new Map();
 
   return (req, res, next) => {
@@ -84,7 +95,7 @@ function createRateLimiter({ max = DEFAULT_RATE_LIMIT_MAX, windowMs = DEFAULT_RA
 
     if (bucket.count >= max) {
       return res.status(429).json({
-        message: 'Too many email requests. Try again later.',
+        message,
       });
     }
 
@@ -209,6 +220,57 @@ function createApp({
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
+  });
+
+  const hemieRateLimit = {
+    max: parsePositiveInteger(process.env.HEMIE_RATE_LIMIT_MAX, DEFAULT_HEMIE_RATE_LIMIT_MAX),
+    windowMs: parsePositiveInteger(
+      process.env.HEMIE_RATE_LIMIT_WINDOW_MS,
+      DEFAULT_RATE_LIMIT_WINDOW_MS,
+    ),
+    message: 'Too many Hemie chat requests. Try again later.',
+  };
+
+  app.post('/hemie/chat', createRateLimiter(hemieRateLimit), async (req, res) => {
+    const authorization = req.get('authorization') || '';
+    const accessToken = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+
+    if (!accessToken) {
+      return res.status(401).json({
+        message: 'Authentication required.',
+      });
+    }
+
+    try {
+      await verifySupabaseAccessToken(accessToken);
+    } catch (error) {
+      const status = Number(error?.status) || 401;
+      return res.status(status).json({
+        message: error?.message || 'Authentication failed.',
+      });
+    }
+
+    const { error: messagesError, messages } = sanitizeMessages(req.body?.messages);
+    if (messagesError) {
+      return res.status(400).json({
+        message: messagesError,
+      });
+    }
+
+    const context = sanitizeContext(req.body?.context);
+
+    try {
+      const result = await generateHemieReply({ messages, context });
+      return res.json({
+        reply: result.reply,
+        source: result.source,
+      });
+    } catch (error) {
+      console.error('Hemie chat failed:', error);
+      return res.status(500).json({
+        message: 'Hemie is temporarily unavailable. Please try again.',
+      });
+    }
   });
 
   app.post(

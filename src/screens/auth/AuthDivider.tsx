@@ -1,5 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { colors } from '@/constants/theme';
+
 export function AuthDivider() {
   return (
     <View style={styles.row}>
@@ -12,7 +14,7 @@ export function AuthDivider() {
 
 const styles = StyleSheet.create({
   line: {
-    backgroundColor: '#d7d7d7',
+    backgroundColor: colors.border,
     flex: 1,
     height: 1,
   },
@@ -23,7 +25,7 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   text: {
-    color: '#747681',
+    color: colors.muted,
     fontSize: 14,
   },
 });

@@ -12,11 +12,11 @@ import {
 } from 'react';
 
 import { supabase } from '@/services/supabase/client';
-import { parseAuthTokensFromUrl } from '@/utils/authRedirect';
 import {
   getBloodbankVerification,
   type BloodbankVerification,
 } from '@/services/supabase/bloodbankVerifications';
+import { parseAuthCodeFromUrl, parseAuthTokensFromUrl } from '@/utils/authRedirect';
 import { prefetchProfileAvatar } from '@/services/supabase/profileAvatar';
 import {
   getProfile,
@@ -55,83 +55,82 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const loadProfile = useCallback(
     async (activeSession: Session | null, options?: { background?: boolean }) => {
-    const requestId = profileRequestIdRef.current + 1;
-    profileRequestIdRef.current = requestId;
-    const applyProfileState = (update: () => void) => {
-      if (mountedRef.current && requestId === profileRequestIdRef.current) {
-        update();
-      }
-    };
+      const requestId = profileRequestIdRef.current + 1;
+      profileRequestIdRef.current = requestId;
+      const applyProfileState = (update: () => void) => {
+        if (mountedRef.current && requestId === profileRequestIdRef.current) {
+          update();
+        }
+      };
 
-    if (!activeSession?.user.id) {
-      applyProfileState(() => {
-        setProfile(null);
-        setBloodbankVerification(null);
-        setAuthError(null);
-        setProfileLoading(false);
-      });
-      return;
-    }
-
-    if (!options?.background) {
-      applyProfileState(() => {
-        setProfileLoading(true);
-      });
-    }
-
-    try {
-      const { data: syncedProfile, error: syncError } = await syncProfileFromAuthUser(
-        activeSession.user,
-      );
-
-      if (syncError) {
-        throw syncError;
+      if (!activeSession?.user.id) {
+        applyProfileState(() => {
+          setProfile(null);
+          setBloodbankVerification(null);
+          setAuthError(null);
+          setProfileLoading(false);
+        });
+        return;
       }
 
-      let resolvedProfile = syncedProfile;
+      if (!options?.background) {
+        applyProfileState(() => {
+          setProfileLoading(true);
+        });
+      }
 
-      if (!resolvedProfile) {
-        const { data, error } = await getProfile(activeSession.user.id);
+      try {
+        const { data: syncedProfile, error: syncError } = await syncProfileFromAuthUser(
+          activeSession.user,
+        );
 
-        if (error) {
-          throw error;
+        if (syncError) {
+          throw syncError;
         }
 
-        resolvedProfile = data;
-      }
+        let resolvedProfile = syncedProfile;
 
-      let verification: BloodbankVerification | null = null;
+        if (!resolvedProfile) {
+          const { data, error } = await getProfile(activeSession.user.id);
 
-      if (resolvedProfile?.role === 'bloodbank') {
-        const { data: verificationData, error: verificationError } =
-          await getBloodbankVerification(activeSession.user.id);
+          if (error) {
+            throw error;
+          }
 
-        if (verificationError) {
-          throw verificationError;
+          resolvedProfile = data;
         }
 
-        verification = verificationData;
-      }
+        let verification: BloodbankVerification | null = null;
 
-      applyProfileState(() => {
-        setProfile(resolvedProfile);
-        setBloodbankVerification(verification);
-        setAuthError(null);
-        setProfileLoading(false);
-      });
+        if (resolvedProfile?.role === 'bloodbank') {
+          const { data, error } = await getBloodbankVerification(activeSession.user.id);
 
-      if (resolvedProfile?.avatar_path) {
-        void prefetchProfileAvatar(resolvedProfile.avatar_path);
+          if (error) {
+            throw error;
+          }
+
+          verification = (data as BloodbankVerification | null) ?? null;
+        }
+
+        applyProfileState(() => {
+          setProfile(resolvedProfile);
+          setBloodbankVerification(verification);
+          setAuthError(null);
+          setProfileLoading(false);
+        });
+
+        if (resolvedProfile?.avatar_path) {
+          void prefetchProfileAvatar(resolvedProfile.avatar_path);
+        }
+      } catch (error) {
+        applyProfileState(() => {
+          setProfile(null);
+          setBloodbankVerification(null);
+          setAuthError(sanitizeAuthError(error, 'Unable to load your profile.'));
+          setProfileLoading(false);
+        });
       }
-    } catch (error) {
-      applyProfileState(() => {
-        setProfile(null);
-        setBloodbankVerification(null);
-        setAuthError(sanitizeAuthError(error, 'Unable to load your profile.'));
-        setProfileLoading(false);
-      });
-    }
-  },
+    },
     [],
   );
 
@@ -193,6 +192,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         if (mountedRef.current) {
           setSession(null);
           setProfile(null);
+          setBloodbankVerification(null);
           setAuthError(sanitizeAuthError(error, 'Unable to initialize auth.'));
         }
       } finally {
@@ -229,7 +229,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       profileRequestIdRef.current += 1;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadProfile]);
 
   useEffect(() => {
     if (initializing) {
@@ -247,14 +247,19 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       const tokens = parseAuthTokensFromUrl(url);
 
-      if (!tokens) {
+      if (tokens) {
+        await supabase.auth.setSession({
+          access_token: tokens.accessToken,
+          refresh_token: tokens.refreshToken,
+        });
         return;
       }
 
-      await supabase.auth.setSession({
-        access_token: tokens.accessToken,
-        refresh_token: tokens.refreshToken,
-      });
+      const code = parseAuthCodeFromUrl(url);
+
+      if (code) {
+        await supabase.auth.exchangeCodeForSession(code);
+      }
     };
 
     void Linking.getInitialURL().then(activateSessionFromUrl);
@@ -276,7 +281,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
 
     return isDonorRecipientProfileComplete(profile);
-  }, [bloodbankVerification, profile]);
+  }, [profile, bloodbankVerification]);
 
   const value = useMemo(
     () => ({

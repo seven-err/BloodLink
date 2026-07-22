@@ -41,6 +41,14 @@
         {
           "photosPermission": "Allow BloodLink to access your photos so you can set a profile picture."
         }
+      ],
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./src/assets/icon.png",
+          "color": "#b91c1c"
+        }
       ]
     ]
   }

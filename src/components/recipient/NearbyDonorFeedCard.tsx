@@ -10,7 +10,7 @@ type NearbyDonorFeedCardProps = {
   isAvailable: boolean;
   name: string;
   onDetails: () => void;
-  onRespond: () => void;
+  onRequest: () => void;
   timeLabel: string;
 };
 
@@ -20,7 +20,7 @@ export function NearbyDonorFeedCard({
   isAvailable,
   name,
   onDetails,
-  onRespond,
+  onRequest,
   timeLabel,
 }: NearbyDonorFeedCardProps) {
   return (
@@ -58,10 +58,10 @@ export function NearbyDonorFeedCard({
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
-          style={({ pressed }) => [styles.respondButton, pressed ? styles.buttonPressed : null]}
-          onPress={onRespond}
+          style={({ pressed }) => [styles.requestButton, pressed ? styles.buttonPressed : null]}
+          onPress={onRequest}
         >
-          <Text style={styles.respondText}>Respond</Text>
+          <Text style={styles.requestText}>Request</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -92,22 +92,6 @@ const styles = StyleSheet.create({
     padding: 16,
     ...shadows.card,
   },
-  detailsButton: {
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: 12,
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: 12,
-  },
-  detailsText: {
-    color: colors.foreground,
-    fontSize: 15,
-    fontWeight: '700',
-  },
   headerCopy: {
     flex: 1,
     gap: 6,
@@ -130,7 +114,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 4,
   },
-  respondButton: {
+  requestButton: {
     alignItems: 'center',
     backgroundColor: colors.primary,
     borderRadius: 12,
@@ -139,8 +123,24 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 12,
   },
-  respondText: {
+  requestText: {
     color: colors.primaryForeground,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  detailsButton: {
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 12,
+  },
+  detailsText: {
+    color: colors.foreground,
     fontSize: 15,
     fontWeight: '700',
   },

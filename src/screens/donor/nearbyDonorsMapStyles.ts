@@ -10,8 +10,8 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
     borderRadius: radii.pill,
     borderWidth: 1,
     justifyContent: 'center',
-    minHeight: 38,
-    paddingHorizontal: 16,
+    minHeight: 36,
+    paddingHorizontal: 14,
   },
   chipActive: {
     backgroundColor: colors.primary,
@@ -19,7 +19,7 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
   },
   chipLabel: {
     color: colors.foreground,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   chipLabelActive: {
@@ -33,20 +33,9 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
   chipScroll: {
     flexGrow: 0,
   },
-  currentLocationButton: {
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 14,
-    height: 48,
-    justifyContent: 'center',
-    width: 48,
-  },
-  currentLocationButtonPressed: {
-    opacity: 0.92,
-  },
   donorList: {
     gap: 12,
-    paddingBottom: 24,
+    paddingBottom: 28,
   },
   donorSectionHeader: {
     alignItems: 'center',
@@ -64,7 +53,7 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radii.card,
     borderWidth: 1,
-    gap: 8,
+    gap: 12,
     padding: 20,
     ...shadows.card,
   },
@@ -78,7 +67,7 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
     color: colors.primary,
     fontSize: 14,
     lineHeight: 20,
-    marginHorizontal: 24,
+    marginBottom: 8,
   },
   filterLink: {
     color: colors.primary,
@@ -89,24 +78,79 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
     backgroundColor: colors.card,
     borderBottomColor: colors.border,
     borderBottomWidth: 1,
-    gap: 14,
-    paddingBottom: 14,
+    gap: 12,
+    paddingBottom: 12,
     paddingHorizontal: 24,
     paddingTop: 8,
+  },
+  headerSubtitle: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
   },
   headerTitle: {
     color: colors.foreground,
     fontSize: 22,
     fontWeight: '800',
   },
+  headerTitleBlock: {
+    gap: 2,
+  },
   listContent: {
     gap: 16,
+    paddingBottom: 8,
     paddingHorizontal: 24,
     paddingTop: 16,
   },
+  listScroll: {
+    flex: 1,
+  },
+  mapControls: {
+    gap: 8,
+    left: 12,
+    position: 'absolute',
+    top: 12,
+    zIndex: 4,
+  },
+  mapControlButton: {
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+    ...shadows.card,
+  },
+  mapControlButtonPressed: {
+    opacity: 0.9,
+  },
+  mapLoadingBadge: {
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    position: 'absolute',
+    right: 12,
+    top: 56,
+    zIndex: 4,
+    ...shadows.card,
+  },
+  mapLoadingText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
   mapSection: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingHorizontal: 0,
+    paddingTop: 0,
   },
   mapSummaryCard: {
     alignItems: 'center',
@@ -114,7 +158,7 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radii.card,
     borderWidth: 1,
-    bottom: 12,
+    bottom: 22,
     flexDirection: 'row',
     justifyContent: 'space-between',
     left: 12,
@@ -122,12 +166,18 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
     paddingVertical: 12,
     position: 'absolute',
     right: 12,
+    zIndex: 4,
     ...shadows.card,
   },
   mapSummaryLabel: {
     color: colors.foreground,
     fontSize: 14,
     fontWeight: '700',
+  },
+  mapSummaryRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   mapSummaryStat: {
     color: colors.success,
@@ -139,18 +189,10 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  mapSummaryRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
   mapWrapper: {
-    height: 280,
+    overflow: 'hidden',
     position: 'relative',
     width: '100%',
-  },
-  listScroll: {
-    flex: 1,
   },
   permissionBanner: {
     backgroundColor: colors.primaryTint,
@@ -170,9 +212,6 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
   screen: {
     backgroundColor: colors.background,
     flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 16,
   },
   searchInput: {
     color: colors.foreground,
@@ -194,24 +233,21 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     gap: 10,
-    minHeight: 48,
+    minHeight: 46,
     paddingHorizontal: 14,
   },
   visibilityCard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    gap: 8,
-    marginHorizontal: 24,
-    marginTop: 12,
-    padding: 14,
-    ...shadows.card,
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    gap: 4,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
   },
   visibilityCopy: {
     color: colors.muted,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
   },
   visibilityRow: {
     alignItems: 'center',
@@ -220,7 +256,7 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
   },
   visibilityTitle: {
     color: colors.foreground,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
   },
 });

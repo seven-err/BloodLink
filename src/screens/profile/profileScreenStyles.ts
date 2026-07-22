@@ -239,6 +239,23 @@ export const profileScreenStyles = StyleSheet.create({
     flex: 1,
     gap: 6,
   },
+  modeSection: {
+    gap: 6,
+  },
+  modeStatusLabel: {
+    color: colors.foreground,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  modeSubtitle: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  modeToggleWrap: {
+    marginTop: 8,
+  },
   roleLabel: {
     color: colors.muted,
     fontSize: 14,

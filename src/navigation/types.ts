@@ -1,7 +1,6 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 
-import type { DonorTabParamList } from '@/navigation/DonorTabNavigator';
-import type { RecipientTabParamList } from '@/navigation/RecipientTabNavigator';
+import type { AppTabParamList } from '@/navigation/AppTabNavigator';
 import type { NearbyMapDonorItem } from '@/services/supabase/nearbyMapDonors';
 import type { BloodType } from '@/types/database';
 
@@ -19,10 +18,8 @@ export type AuthStackParamList = {
 };
 
 export type AppStackParamList = {
-  DonorTabs: NavigatorScreenParams<DonorTabParamList> | undefined;
-  RecipientTabs: NavigatorScreenParams<RecipientTabParamList> | undefined;
+  AppTabs: NavigatorScreenParams<AppTabParamList> | undefined;
   HemieAI: undefined;
-  AppProfile: undefined;
   EditProfile: undefined;
   Settings: undefined;
   AccountSettings: undefined;
@@ -44,6 +41,5 @@ export type AppStackParamList = {
     recipientDisplayName?: string;
   };
   Notifications: undefined;
-  NearbyDonorsMap: undefined;
   NearbyDonorDetail: { donor: NearbyMapDonorItem };
 };

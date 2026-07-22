@@ -1,5 +1,5 @@
 import * as Location from 'expo-location';
-import { Building2, Camera, Heart, MapPin, Users } from 'lucide-react-native';
+import { Camera, Heart, MapPin, Users } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, Text, View } from 'react-native';
 
@@ -8,14 +8,11 @@ import { FormTextInput } from '@/components/forms/FormTextInput';
 import { BLOOD_TYPES } from '@/constants/bloodTypes';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import { submitBloodbankVerification } from '@/services/supabase/bloodbankVerifications';
-import type { LocalDocument } from '@/services/supabase/storageUpload';
 import { completeProfile } from '@/services/supabase/profiles';
 import type { BloodType, OnboardingRole } from '@/types/database';
 import { getDonorEligibilityIssues } from '@/utils/donorEligibility';
 import { AuthBrand } from '../AuthBrand';
 import { authStyles } from '../styles';
-import { DocumentPickerField } from './components/DocumentPickerField';
 import { EligibilityCallout } from './components/EligibilityCallout';
 import { ProfileSetupProgress } from './components/ProfileSetupProgress';
 import { RoleSelectionCard } from './components/RoleSelectionCard';
@@ -41,16 +38,6 @@ type DonorDetails = {
 type RecipientDetails = {
   bloodType: BloodType | null;
   enableLocation: boolean;
-};
-
-type BloodbankDetails = {
-  branchLocation: string;
-  documents: LocalDocument[];
-  employeeId: string;
-  hospitalName: string;
-  position: string;
-  workEmail: string;
-  workPhone: string;
 };
 
 const getPrefillValue = (
@@ -107,23 +94,9 @@ export function ProfileSetupWizard() {
     bloodType: profile?.blood_type ?? null,
     enableLocation: false,
   });
-  const [bloodbankDetails, setBloodbankDetails] = useState<BloodbankDetails>({
-    branchLocation: '',
-    documents: [],
-    employeeId: '',
-    hospitalName: profile?.organization_name ?? '',
-    position: '',
-    workEmail: session?.user.email ?? '',
-    workPhone: prefilledBasicInfo.phone,
-  });
 
   useEffect(() => {
     setBasicInfo(prefilledBasicInfo);
-    setBloodbankDetails((current) => ({
-      ...current,
-      workEmail: prefilledBasicInfo.email || current.workEmail,
-      workPhone: prefilledBasicInfo.phone || current.workPhone,
-    }));
   }, [prefilledBasicInfo]);
 
   const hasPrefilledName = Boolean(prefilledBasicInfo.fullName);
@@ -142,11 +115,9 @@ export function ProfileSetupWizard() {
       ? 'Step 1 of 3: Basic Information'
       : step === 2
         ? 'Step 2 of 3: Account Type'
-        : role === 'bloodbank'
-          ? 'Step 3 of 3: Work Verification'
-          : role === 'recipient'
-            ? 'Step 3 of 3: Recipient Details'
-            : 'Step 3 of 3: Donor Details';
+        : role === 'recipient'
+          ? 'Step 3 of 3: Recipient Details'
+          : 'Step 3 of 3: Donor Details';
 
   const captureLocation = async () => {
     const permission = await Location.requestForegroundPermissionsAsync();
@@ -227,43 +198,6 @@ export function ProfileSetupWizard() {
       return false;
     }
 
-    if (role === 'bloodbank') {
-      if (!bloodbankDetails.position.trim()) {
-        setError('Position or role is required.');
-        return false;
-      }
-
-      if (!bloodbankDetails.employeeId.trim()) {
-        setError('Employee or staff ID is required.');
-        return false;
-      }
-
-      if (!bloodbankDetails.hospitalName.trim()) {
-        setError('Hospital or blood bank name is required.');
-        return false;
-      }
-
-      if (!bloodbankDetails.branchLocation.trim()) {
-        setError('Branch or location is required.');
-        return false;
-      }
-
-      if (!bloodbankDetails.workEmail.includes('@')) {
-        setError('A valid work email address is required.');
-        return false;
-      }
-
-      if (bloodbankDetails.workPhone.trim().length < 10) {
-        setError('A valid work phone number is required.');
-        return false;
-      }
-
-      if (!bloodbankDetails.documents.length) {
-        setError('Upload at least one proof of affiliation document.');
-        return false;
-      }
-    }
-
     setError(null);
     return true;
   };
@@ -296,52 +230,31 @@ export function ProfileSetupWizard() {
     try {
       const fullName = (hasPrefilledName ? prefilledBasicInfo.fullName : basicInfo.fullName).trim();
       const phone = (hasPrefilledPhone ? prefilledBasicInfo.phone : basicInfo.phone).trim();
+      const enableLocation =
+        role === 'donor' ? donorDetails.enableLocation : recipientDetails.enableLocation;
 
-      if (role === 'bloodbank') {
-        const { error: verificationError } = await submitBloodbankVerification({
-          branchLocation: bloodbankDetails.branchLocation,
-          documents: bloodbankDetails.documents,
-          employeeId: bloodbankDetails.employeeId,
-          fullName,
-          hospitalName: bloodbankDetails.hospitalName,
-          phone,
-          position: bloodbankDetails.position,
-          userId: session.user.id,
-          workEmail: bloodbankDetails.workEmail,
-          workPhone: bloodbankDetails.workPhone,
-        });
+      if (enableLocation && (coordinates.latitude === null || coordinates.longitude === null)) {
+        await captureLocation();
+      }
 
-        if (verificationError) {
-          setError(verificationError.message);
-          return;
-        }
-      } else {
-        const enableLocation =
-          role === 'donor' ? donorDetails.enableLocation : recipientDetails.enableLocation;
+      const weightKg = Number(donorDetails.weightKg);
+      const { error: profileError } = await completeProfile({
+        bloodType: role === 'donor' ? donorDetails.bloodType : recipientDetails.bloodType,
+        birthdate: role === 'donor' ? donorDetails.birthdate : null,
+        fullName,
+        isAvailable: role === 'donor' ? donorDetails.availableToDonate : false,
+        lastDonationAt: donorDetails.lastDonationDate || null,
+        latitude: enableLocation ? coordinates.latitude : null,
+        longitude: enableLocation ? coordinates.longitude : null,
+        phone,
+        role,
+        userId: session.user.id,
+        weightKg: role === 'donor' && Number.isFinite(weightKg) ? weightKg : null,
+      });
 
-        if (enableLocation && (coordinates.latitude === null || coordinates.longitude === null)) {
-          await captureLocation();
-        }
-
-        const weightKg = Number(donorDetails.weightKg);
-        const { error: profileError } = await completeProfile({
-          bloodType: role === 'donor' ? donorDetails.bloodType : recipientDetails.bloodType,
-          birthdate: role === 'donor' ? donorDetails.birthdate : null,
-          fullName,
-          isAvailable: role === 'donor' ? donorDetails.availableToDonate : false,
-          lastDonationAt: donorDetails.lastDonationDate || null,
-          latitude: enableLocation ? coordinates.latitude : null,
-          longitude: enableLocation ? coordinates.longitude : null,
-          phone,
-          role,
-          userId: session.user.id,
-          weightKg: role === 'donor' && Number.isFinite(weightKg) ? weightKg : null,
-        });
-
-        if (profileError) {
-          setError(profileError.message);
-          return;
-        }
+      if (profileError) {
+        setError(profileError.message);
+        return;
       }
 
       await refreshProfile();
@@ -391,7 +304,7 @@ export function ProfileSetupWizard() {
   const renderStep1 = () => (
     <View style={profileSetupStyles.section}>
       <View style={profileSetupStyles.photoCircle}>
-        <Camera color="#9ca3af" size={32} />
+        <Camera color={colors.mutedLight} size={32} />
       </View>
       <Pressable style={profileSetupStyles.uploadButton}>
         <Text style={profileSetupStyles.uploadButtonText}>Upload Photo</Text>
@@ -458,14 +371,6 @@ export function ProfileSetupWizard() {
         selected={role === 'recipient'}
         title="Recipient"
         onPress={() => setRole('recipient')}
-      />
-      <RoleSelectionCard
-        description="I work at a blood bank"
-        icon={<Building2 color={colors.success} size={22} />}
-        iconBackground={colors.successSoft}
-        selected={role === 'bloodbank'}
-        title="Blood Bank Personnel"
-        onPress={() => setRole('bloodbank')}
       />
     </View>
   );
@@ -558,89 +463,6 @@ export function ProfileSetupWizard() {
     </>
   );
 
-  const renderBloodbankStep3 = () => (
-    <>
-      <View style={profileSetupStyles.section}>
-        <Text style={profileSetupStyles.sectionTitle}>Basic work information</Text>
-        {hasPrefilledName ? (
-          <View style={profileSetupStyles.readOnlyField}>
-            <Text style={profileSetupStyles.readOnlyLabel}>Full Name</Text>
-            <Text style={profileSetupStyles.readOnlyValue}>
-              {hasPrefilledName ? prefilledBasicInfo.fullName : basicInfo.fullName}
-            </Text>
-          </View>
-        ) : null}
-        <FormTextInput
-          label="Position / Role"
-          placeholder="Blood Bank Staff, Medical Technologist, Nurse"
-          value={bloodbankDetails.position}
-          onChangeText={(position) =>
-            setBloodbankDetails((current) => ({ ...current, position }))
-          }
-        />
-        <FormTextInput
-          label="Employee / Staff ID"
-          placeholder="Employee ID number"
-          value={bloodbankDetails.employeeId}
-          onChangeText={(employeeId) =>
-            setBloodbankDetails((current) => ({ ...current, employeeId }))
-          }
-        />
-        <FormTextInput
-          label="Hospital / Blood Bank Name"
-          placeholder="Hospital or blood bank name"
-          value={bloodbankDetails.hospitalName}
-          onChangeText={(hospitalName) =>
-            setBloodbankDetails((current) => ({ ...current, hospitalName }))
-          }
-        />
-        <FormTextInput
-          label="Branch / Location"
-          placeholder="Branch or site location"
-          value={bloodbankDetails.branchLocation}
-          onChangeText={(branchLocation) =>
-            setBloodbankDetails((current) => ({ ...current, branchLocation }))
-          }
-        />
-      </View>
-      <View style={profileSetupStyles.section}>
-        <Text style={profileSetupStyles.sectionTitle}>Contact information</Text>
-        <FormTextInput
-          autoCapitalize="none"
-          keyboardType="email-address"
-          label="Work Email Address"
-          placeholder="name@hospital.gov"
-          value={bloodbankDetails.workEmail}
-          onChangeText={(workEmail) =>
-            setBloodbankDetails((current) => ({ ...current, workEmail }))
-          }
-        />
-        <FormTextInput
-          keyboardType="phone-pad"
-          label="Phone Number"
-          placeholder="Work phone number"
-          value={bloodbankDetails.workPhone}
-          onChangeText={(workPhone) =>
-            setBloodbankDetails((current) => ({ ...current, workPhone }))
-          }
-        />
-      </View>
-      <DocumentPickerField
-        documents={bloodbankDetails.documents}
-        error={error && !bloodbankDetails.documents.length ? error : null}
-        onChange={(documents) => setBloodbankDetails((current) => ({ ...current, documents }))}
-      />
-      <View style={profileSetupStyles.infoCallout}>
-        <Text style={profileSetupStyles.infoCalloutTitle}>Verification status</Text>
-        <Text style={profileSetupStyles.infoCalloutText}>
-          After submission, your Blood Bank Personnel account will be under review. BloodLink
-          administrators will verify your submitted information before granting access to blood bank
-          features.
-        </Text>
-      </View>
-    </>
-  );
-
   const renderStep3 = () => {
     if (role === 'donor') {
       return renderDonorStep3();
@@ -648,10 +470,6 @@ export function ProfileSetupWizard() {
 
     if (role === 'recipient') {
       return renderRecipientStep3();
-    }
-
-    if (role === 'bloodbank') {
-      return renderBloodbankStep3();
     }
 
     return null;

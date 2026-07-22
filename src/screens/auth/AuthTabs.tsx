@@ -1,5 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { colors } from '@/constants/theme';
+
 type AuthTabsProps = {
   active: 'login' | 'signup';
   onLogin: () => void;
@@ -8,14 +10,22 @@ type AuthTabsProps = {
 
 export function AuthTabs({ active, onLogin, onSignup }: AuthTabsProps) {
   return (
-    <View style={styles.tabs}>
-      <Pressable style={styles.tab} onPress={onLogin}>
-        <Text style={[styles.tabText, active === 'login' ? styles.activeText : null]}>
-          Login
-        </Text>
+    <View accessibilityRole="tablist" style={styles.tabs}>
+      <Pressable
+        accessibilityRole="tab"
+        accessibilityState={{ selected: active === 'login' }}
+        style={styles.tab}
+        onPress={onLogin}
+      >
+        <Text style={[styles.tabText, active === 'login' ? styles.activeText : null]}>Login</Text>
         <View style={[styles.indicator, active === 'login' ? styles.active : null]} />
       </Pressable>
-      <Pressable style={styles.tab} onPress={onSignup}>
+      <Pressable
+        accessibilityRole="tab"
+        accessibilityState={{ selected: active === 'signup' }}
+        style={styles.tab}
+        onPress={onSignup}
+      >
         <Text style={[styles.tabText, active === 'signup' ? styles.activeText : null]}>
           Sign Up
         </Text>
@@ -27,13 +37,13 @@ export function AuthTabs({ active, onLogin, onSignup }: AuthTabsProps) {
 
 const styles = StyleSheet.create({
   active: {
-    backgroundColor: '#e50914',
+    backgroundColor: colors.primary,
   },
   activeText: {
-    color: '#e50914',
+    color: colors.primary,
   },
   indicator: {
-    backgroundColor: '#d8d8d8',
+    backgroundColor: colors.border,
     height: 1,
     marginTop: 16,
     width: '100%',
@@ -43,7 +53,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tabText: {
-    color: '#71717a',
+    color: colors.muted,
     fontSize: 16,
     fontWeight: '600',
   },
