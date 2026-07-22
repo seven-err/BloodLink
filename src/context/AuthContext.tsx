@@ -103,7 +103,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         let verification: BloodbankVerification | null = null;
 
         if (resolvedProfile?.role === 'bloodbank') {
-          const { data, error } = await getBloodbankVerification(resolvedProfile.id);
+          const { data, error } = await getBloodbankVerification(activeSession.user.id);
 
           if (error) {
             throw error;
@@ -163,7 +163,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (mountedRef.current) {
         setSession(null);
         setProfile(null);
-        setBloodbankVerification(null);
         setAuthError(sanitizeAuthError(error, 'Unable to start the app.'));
       }
     } finally {
@@ -230,7 +229,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       profileRequestIdRef.current += 1;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadProfile]);
 
   useEffect(() => {
     if (initializing) {
@@ -277,8 +276,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return false;
     }
 
+    if (profile.role === 'bloodbank') {
+      return Boolean(bloodbankVerification);
+    }
+
     return isDonorRecipientProfileComplete(profile);
-  }, [profile]);
+  }, [profile, bloodbankVerification]);
 
   const value = useMemo(
     () => ({

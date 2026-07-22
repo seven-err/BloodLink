@@ -371,7 +371,8 @@ export function RecipientHomeScreen({ navigation }: Props) {
                 isAvailable={donor.isAvailable}
                 name={donor.fullName}
                 timeLabel={donor.timeLabel}
-                onPress={() => openDonorDetail(donor)}
+                onDetails={() => openDonorDetail(donor)}
+                onRequest={() => openDonorDetail(donor)}
               />
             ))
           )}

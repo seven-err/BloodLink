@@ -9,7 +9,8 @@ type NearbyDonorFeedCardProps = {
   distanceLabel: string;
   isAvailable: boolean;
   name: string;
-  onPress: () => void;
+  onDetails: () => void;
+  onRequest: () => void;
   timeLabel: string;
 };
 
@@ -18,7 +19,8 @@ export function NearbyDonorFeedCard({
   distanceLabel,
   isAvailable,
   name,
-  onPress,
+  onDetails,
+  onRequest,
   timeLabel,
 }: NearbyDonorFeedCardProps) {
   return (
@@ -53,19 +55,31 @@ export function NearbyDonorFeedCard({
         </View>
       </View>
 
-      <Pressable
-        accessibilityLabel={`View donor ${name}`}
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.primaryButton, pressed ? styles.buttonPressed : null]}
-        onPress={onPress}
-      >
-        <Text style={styles.primaryText}>View donor</Text>
-      </Pressable>
+      <View style={styles.actions}>
+        <Pressable
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.requestButton, pressed ? styles.buttonPressed : null]}
+          onPress={onRequest}
+        >
+          <Text style={styles.requestText}>Request</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.detailsButton, pressed ? styles.buttonPressed : null]}
+          onPress={onDetails}
+        >
+          <Text style={styles.detailsText}>Details</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  actions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   buttonPressed: {
     opacity: 0.9,
   },
@@ -100,16 +114,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 4,
   },
-  primaryButton: {
+  requestButton: {
     alignItems: 'center',
     backgroundColor: colors.primary,
     borderRadius: 12,
+    flex: 1,
     justifyContent: 'center',
     minHeight: 44,
     paddingHorizontal: 12,
   },
-  primaryText: {
+  requestText: {
     color: colors.primaryForeground,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  detailsButton: {
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 12,
+  },
+  detailsText: {
+    color: colors.foreground,
     fontSize: 15,
     fontWeight: '700',
   },

@@ -9,7 +9,8 @@ import type { BloodRequestUrgency } from '@/types/database';
 type UrgentRequestCardProps = {
   bloodType: string;
   distanceLabel: string;
-  onPress: () => void;
+  onDetails: () => void;
+  onRespond: () => void;
   timeLabel: string;
   title: string;
   urgency: BloodRequestUrgency;
@@ -18,7 +19,8 @@ type UrgentRequestCardProps = {
 export function UrgentRequestCard({
   bloodType,
   distanceLabel,
-  onPress,
+  onDetails,
+  onRespond,
   timeLabel,
   title,
   urgency,
@@ -41,19 +43,31 @@ export function UrgentRequestCard({
         </View>
       </View>
 
-      <Pressable
-        accessibilityLabel={`View ${title}`}
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.primaryButton, pressed ? styles.buttonPressed : null]}
-        onPress={onPress}
-      >
-        <Text style={styles.primaryText}>View request</Text>
-      </Pressable>
+      <View style={styles.actions}>
+        <Pressable
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.respondButton, pressed ? styles.buttonPressed : null]}
+          onPress={onRespond}
+        >
+          <Text style={styles.respondText}>Respond</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.detailsButton, pressed ? styles.buttonPressed : null]}
+          onPress={onDetails}
+        >
+          <Text style={styles.detailsText}>Details</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  actions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   buttonPressed: {
     opacity: 0.9,
   },
@@ -88,16 +102,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 4,
   },
-  primaryButton: {
+  respondButton: {
     alignItems: 'center',
     backgroundColor: colors.primary,
     borderRadius: 12,
+    flex: 1,
     justifyContent: 'center',
     minHeight: 44,
     paddingHorizontal: 12,
   },
-  primaryText: {
+  respondText: {
     color: colors.primaryForeground,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  detailsButton: {
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 12,
+  },
+  detailsText: {
+    color: colors.foreground,
     fontSize: 15,
     fontWeight: '700',
   },

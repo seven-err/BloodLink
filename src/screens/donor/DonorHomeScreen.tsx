@@ -405,7 +405,12 @@ export function DonorHomeScreen({ navigation }: Props) {
                 timeLabel={request.timeLabel}
                 title={request.title}
                 urgency={request.urgency}
-                onPress={() =>
+                onDetails={() =>
+                  navigation
+                    .getParent()
+                    ?.navigate('DonorRequestDetail', { requestId: request.id })
+                }
+                onRespond={() =>
                   navigation
                     .getParent()
                     ?.navigate('DonorRequestDetail', { requestId: request.id })
