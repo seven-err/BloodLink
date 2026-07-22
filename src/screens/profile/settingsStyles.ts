@@ -22,7 +22,7 @@ export const settingsStyles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     paddingBottom: 14,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 8,
   },
   headerBackButton: {

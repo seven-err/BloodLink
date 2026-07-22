@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { useAuth } from '@/context/AuthContext';
 import { AuthProfileErrorScreen } from '@/screens/AuthProfileErrorScreen';
 import { RestrictedAccessScreen } from '@/screens/RestrictedAccessScreen';
-import { isMobileAppRole } from '@/utils/roles';
+import { isAdminRole, isBloodbankRole, isMobileAppRole } from '@/utils/roles';
 import { AppNavigator } from './AppNavigator';
 import { AuthNavigator } from './AuthNavigator';
 import { BloodBankNavigator } from './BloodBankNavigator';
@@ -20,16 +20,14 @@ export function RootNavigator() {
   } = useAuth();
 
   const profilePending = Boolean(session && profileLoading && !profile);
-  const isAdmin = profile?.role === 'admin';
-  const isBloodbank = profile?.role === 'bloodbank';
-  const showBloodbankApp = Boolean(
-    session && isBloodbank && profileComplete && bloodbankVerification,
-  );
   const showDonorRecipientApp = Boolean(
     session && (profilePending || (profileComplete && isMobileAppRole(profile?.role))),
   );
-  const showProfileSetup = Boolean(session && profile && !profileComplete);
-  const showRestrictedAccess = Boolean(session && profile && isAdmin);
+  const showBloodBankApp = Boolean(session && profile && isBloodbankRole(profile.role));
+  const showRestrictedAccess = Boolean(session && profile && isAdminRole(profile.role));
+  const showProfileSetup = Boolean(
+    session && profile && !profileComplete && isMobileAppRole(profile.role),
+  );
 
   if (authError) {
     return <AuthProfileErrorScreen />;
@@ -41,10 +39,10 @@ export function RootNavigator() {
         <AuthNavigator />
       ) : showRestrictedAccess ? (
         <RestrictedAccessScreen />
+      ) : showBloodBankApp ? (
+        <BloodBankNavigator verificationStatus={bloodbankVerification?.status ?? 'pending'} />
       ) : showProfileSetup ? (
         <ProfileSetupNavigator />
-      ) : showBloodbankApp ? (
-        <BloodBankNavigator verificationStatus={bloodbankVerification!.status} />
       ) : showDonorRecipientApp ? (
         <AppNavigator />
       ) : (

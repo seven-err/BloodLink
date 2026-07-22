@@ -26,8 +26,19 @@ In Supabase Dashboard > Authentication > Providers:
 
 1. Enable Email provider.
 2. Enable Phone provider.
-3. Keep Phone OTP on Supabase defaults for v1.
-4. For production, configure a dedicated SMS provider and rate limits before launch.
+3. Enable Google provider (Web client ID + optional iOS/Android client IDs from Google Cloud Console).
+4. Keep Phone OTP on Supabase defaults for v1.
+5. For production, configure a dedicated SMS provider and rate limits before launch.
+
+### Google OAuth redirect URLs
+
+Add these redirect URLs under Authentication > URL Configuration:
+
+- `bloodlink://auth/callback` (native Expo scheme)
+- Your Expo web origin (for example `http://localhost:8081`)
+- Any Expo Go proxy redirect shown by `makeRedirectUri` during development
+
+The mobile app opens Google via `expo-web-browser` + `supabase.auth.signInWithOAuth`, then completes the session with hash tokens or PKCE `exchangeCodeForSession`.
 
 The app client stores sessions with `expo-secure-store` through `src/services/supabase/client.ts`.
 
@@ -43,12 +54,15 @@ In Supabase Dashboard > SQL Editor:
    - `blood_requests`
    - `messages`
    - `notifications`
+   - `notification_preferences`
+   - `push_tokens`
    - `donations`
    - `availability`
    - `faqs`
    - `reports`
    - `analytics`
    - `donor_verifications`
+   - `bloodbank_verifications`
    - `donor_matches`
 5. Confirm `profiles.birthdate` exists for Phase 3 profile completion.
 6. Confirm these relationships exist through `profiles.id`:

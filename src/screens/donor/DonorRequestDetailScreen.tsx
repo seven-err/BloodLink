@@ -360,7 +360,7 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
         <PrimaryButton
           title="Back to open requests"
           variant="secondary"
-          onPress={() => navigation.navigate('DonorTabs', { screen: 'DonorRequestFeed' })}
+          onPress={() => navigation.navigate('AppTabs', { screen: 'Requests' })}
         />
       </View>
     );
@@ -374,7 +374,7 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
         <PrimaryButton
           title="Back to open requests"
           variant="secondary"
-          onPress={() => navigation.navigate('DonorTabs', { screen: 'DonorRequestFeed' })}
+          onPress={() => navigation.navigate('AppTabs', { screen: 'Requests' })}
         />
       </View>
     );
@@ -429,7 +429,7 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
         <PrimaryButton
           title="Back to open requests"
           variant="secondary"
-          onPress={() => navigation.navigate('DonorTabs', { screen: 'DonorRequestFeed' })}
+          onPress={() => navigation.navigate('AppTabs', { screen: 'Requests' })}
         />
       </ScrollView>
     );
@@ -525,7 +525,7 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
       <PrimaryButton
         title="Back to open requests"
         variant="secondary"
-        onPress={() => navigation.navigate('DonorTabs', { screen: 'DonorRequestFeed' })}
+        onPress={() => navigation.navigate('AppTabs', { screen: 'Requests' })}
       />
     </ScrollView>
   );

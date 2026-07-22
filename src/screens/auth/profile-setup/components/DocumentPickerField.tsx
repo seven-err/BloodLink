@@ -1,7 +1,10 @@
 import * as DocumentPicker from 'expo-document-picker';
+import { X } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
+import { colors } from '@/constants/theme';
 import type { LocalDocument } from '@/services/supabase/storageUpload';
+
 import { profileSetupStyles } from '../styles';
 
 const ACCEPTED_TYPES = [
@@ -13,7 +16,7 @@ const ACCEPTED_TYPES = [
 
 type DocumentPickerFieldProps = {
   documents: LocalDocument[];
-  error?: string | null;
+  error?: string;
   onChange: (documents: LocalDocument[]) => void;
 };
 
@@ -33,7 +36,7 @@ export function DocumentPickerField({
       return;
     }
 
-    const nextDocuments = result.assets.map((asset) => ({
+    const nextDocuments: LocalDocument[] = result.assets.map((asset) => ({
       mimeType: asset.mimeType,
       name: asset.name,
       uri: asset.uri,
@@ -49,30 +52,34 @@ export function DocumentPickerField({
   return (
     <View style={profileSetupStyles.section}>
       <Text style={profileSetupStyles.sectionTitle}>Proof of affiliation</Text>
-      <Text style={profileSetupStyles.stepSubtitle}>
-        Upload at least one: staff ID, certificate of employment, authorization letter,
-        PRC/license ID, or hospital/blood bank document.
-      </Text>
-      <Pressable style={profileSetupStyles.uploadButton} onPress={pickDocuments}>
-        <Text style={profileSetupStyles.uploadButtonText}>Upload document</Text>
+      <Pressable
+        accessibilityRole="button"
+        style={profileSetupStyles.uploadButton}
+        onPress={pickDocuments}
+      >
+        <Text style={profileSetupStyles.uploadButtonText}>
+          {documents.length ? 'Add another document' : 'Upload documents'}
+        </Text>
       </Pressable>
       {documents.length ? (
         <View style={profileSetupStyles.documentList}>
           {documents.map((document, index) => (
-            <Pressable
-              key={`${document.uri}-${index}`}
-              style={profileSetupStyles.documentChip}
-              onPress={() => removeDocument(index)}
-            >
+            <View key={`${document.uri}-${index}`} style={profileSetupStyles.documentChip}>
               <Text numberOfLines={1} style={profileSetupStyles.documentChipText}>
                 {document.name}
               </Text>
-              <Text style={profileSetupStyles.documentChipText}>Remove</Text>
-            </Pressable>
+              <Pressable
+                accessibilityLabel={`Remove ${document.name}`}
+                accessibilityRole="button"
+                onPress={() => removeDocument(index)}
+              >
+                <X color={colors.primaryDark} size={16} />
+              </Pressable>
+            </View>
           ))}
         </View>
       ) : null}
-      {error ? <Text style={{ color: '#dc2626', fontSize: 13 }}>{error}</Text> : null}
+      {error ? <Text style={{ color: colors.primary }}>{error}</Text> : null}
     </View>
   );
 }

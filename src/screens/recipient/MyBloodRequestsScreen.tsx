@@ -3,12 +3,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import {
-  RefreshControl,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import { Plus } from 'lucide-react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RequestListCard } from '@/components/bloodRequest/RequestListCard';
 import { ContentLoadingSkeleton } from '@/components/common/ContentLoadingSkeleton';
@@ -16,7 +13,7 @@ import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { colors } from '@/constants/theme';
 import { URGENCY_LABELS } from '@/constants/bloodRequestUrgency';
 import { useAuth } from '@/context/AuthContext';
-import type { RecipientTabParamList } from '@/navigation/RecipientTabNavigator';
+import type { AppTabParamList } from '@/navigation/AppTabNavigator';
 import type { AppStackParamList } from '@/navigation/types';
 import { recipientStyles } from '@/screens/recipient/styles';
 import { authStyles } from '@/screens/auth/styles';
@@ -24,7 +21,7 @@ import { getMyBloodRequests, type BloodRequest } from '@/services/supabase/blood
 
 type Props =
   | CompositeScreenProps<
-      BottomTabScreenProps<RecipientTabParamList, 'RecipientRequests'>,
+      BottomTabScreenProps<AppTabParamList, 'Requests'>,
       NativeStackScreenProps<AppStackParamList>
     >
   | NativeStackScreenProps<AppStackParamList, 'MyBloodRequests'>;
@@ -38,6 +35,8 @@ const formatDateTime = (value: string | null) => {
 };
 
 export function MyBloodRequestsScreen({ navigation }: Props) {
+  const { top: topInset } = useSafeAreaInsets();
+  const isTabScreen = 'jumpTo' in navigation;
   const stackNavigation = 'getParent' in navigation ? navigation.getParent() : navigation;
   const { session } = useAuth();
   const [requests, setRequests] = useState<BloodRequest[]>([]);
@@ -83,6 +82,10 @@ export function MyBloodRequestsScreen({ navigation }: Props) {
     }, [loadRequests]),
   );
 
+  const openCreateRequest = () => {
+    stackNavigation?.navigate('CreateBloodRequest');
+  };
+
   if (loading) {
     return <ContentLoadingSkeleton />;
   }
@@ -95,7 +98,7 @@ export function MyBloodRequestsScreen({ navigation }: Props) {
         <PrimaryButton
           title="Create blood request"
           variant="secondary"
-          onPress={() => stackNavigation?.navigate('CreateBloodRequest')}
+          onPress={openCreateRequest}
         />
       </View>
     );
@@ -103,25 +106,45 @@ export function MyBloodRequestsScreen({ navigation }: Props) {
 
   return (
     <View style={recipientStyles.screen}>
+      {isTabScreen ? (
+        <View style={[recipientStyles.tabHeader, { paddingTop: topInset + 8 }]}>
+          <Text style={recipientStyles.tabHeaderTitle}>My Requests</Text>
+          <Pressable
+            accessibilityLabel="Create blood request"
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              recipientStyles.createHeaderButton,
+              pressed ? recipientStyles.createHeaderButtonPressed : null,
+            ]}
+            onPress={openCreateRequest}
+          >
+            <Plus color={colors.primaryForeground} size={18} strokeWidth={2.5} />
+            <Text style={recipientStyles.createHeaderButtonText}>Create</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       <ScrollView
         contentContainerStyle={recipientStyles.listContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            tintColor={colors.primaryDark}
+            tintColor={colors.primary}
             onRefresh={() => void loadRequests(true)}
           />
         }
       >
-        <View style={recipientStyles.card}>
-          <View style={recipientStyles.sectionIntro}>
-            <Text style={recipientStyles.eyebrow}>My requests</Text>
-            <Text style={recipientStyles.title}>Blood request history</Text>
-            <Text style={recipientStyles.subtitle}>
-              Track open requests and review details for each submission.
-            </Text>
+        {!isTabScreen ? (
+          <View style={recipientStyles.card}>
+            <View style={recipientStyles.sectionIntro}>
+              <Text style={recipientStyles.eyebrow}>My requests</Text>
+              <Text style={recipientStyles.title}>Blood request history</Text>
+              <Text style={recipientStyles.subtitle}>
+                Track open requests and review details for each submission.
+              </Text>
+            </View>
           </View>
-        </View>
+        ) : null}
 
         {error ? <Text style={authStyles.error}>{error}</Text> : null}
 
@@ -153,10 +176,9 @@ export function MyBloodRequestsScreen({ navigation }: Props) {
           ))
         )}
 
-        <PrimaryButton
-          title="Create blood request"
-          onPress={() => stackNavigation?.navigate('CreateBloodRequest')}
-        />
+        {!isTabScreen ? (
+          <PrimaryButton title="Create blood request" onPress={openCreateRequest} />
+        ) : null}
       </ScrollView>
     </View>
   );

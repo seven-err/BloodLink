@@ -50,6 +50,24 @@ export const recipientStyles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
+  createHeaderButton: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    minHeight: 40,
+    paddingHorizontal: 14,
+  },
+  createHeaderButtonPressed: {
+    opacity: 0.92,
+  },
+  createHeaderButtonText: {
+    color: colors.primaryForeground,
+    fontSize: 14,
+    fontWeight: '700',
+  },
   detailGrid: {
     borderTopColor: colors.border,
     borderTopWidth: 1,
@@ -98,7 +116,7 @@ export const recipientStyles = StyleSheet.create({
   },
   infoBanner: {
     backgroundColor: colors.infoSoft,
-    borderColor: '#bfdbfe',
+    borderColor: colors.infoSoft,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 4,
@@ -133,7 +151,7 @@ export const recipientStyles = StyleSheet.create({
   },
   pill: {
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.background,
     borderColor: colors.border,
     borderRadius: 12,
     borderWidth: 1,
@@ -151,7 +169,7 @@ export const recipientStyles = StyleSheet.create({
     borderColor: colors.primary,
   },
   pillText: {
-    color: '#374151',
+    color: colors.foreground,
     fontWeight: '700',
     textTransform: 'capitalize',
   },
@@ -183,10 +201,27 @@ export const recipientStyles = StyleSheet.create({
     lineHeight: 24,
   },
   successText: {
-    color: '#166534',
+    color: colors.success,
     fontSize: 15,
     fontWeight: '600',
     lineHeight: 22,
+  },
+  tabHeader: {
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+    paddingBottom: 14,
+    paddingHorizontal: 24,
+  },
+  tabHeaderTitle: {
+    color: colors.foreground,
+    flex: 1,
+    fontSize: 22,
+    fontWeight: '800',
   },
   title: {
     color: colors.foreground,
@@ -199,7 +234,7 @@ export const recipientStyles = StyleSheet.create({
   },
   urgencyPillNormal: {
     backgroundColor: colors.infoSoft,
-    borderColor: '#93c5fd',
+    borderColor: colors.info,
   },
   urgencyPillTextCritical: {
     color: colors.primaryForeground,
@@ -212,6 +247,6 @@ export const recipientStyles = StyleSheet.create({
   },
   urgencyPillUrgent: {
     backgroundColor: colors.orangeSoft,
-    borderColor: '#fdba74',
+    borderColor: colors.warning,
   },
 });

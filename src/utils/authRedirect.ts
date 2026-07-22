@@ -18,32 +18,41 @@ export const getAuthRedirectUrl = () => {
   return Linking.createURL('auth/callback');
 };
 
-export const parseAuthTokensFromUrl = (url: string) => {
+const getUrlSearchParams = (url: string) => {
   const hashIndex = url.indexOf('#');
-
-  if (hashIndex >= 0) {
-    const hashParams = new URLSearchParams(url.slice(hashIndex + 1));
-    const accessToken = hashParams.get('access_token');
-    const refreshToken = hashParams.get('refresh_token');
-
-    if (accessToken && refreshToken) {
-      return { accessToken, refreshToken };
-    }
-  }
-
   const queryIndex = url.indexOf('?');
+  const params = new URLSearchParams();
 
   if (queryIndex >= 0) {
-    const queryParams = new URLSearchParams(url.slice(queryIndex + 1));
-    const accessToken = queryParams.get('access_token');
-    const refreshToken = queryParams.get('refresh_token');
+    const queryEnd = hashIndex >= 0 && hashIndex > queryIndex ? hashIndex : url.length;
+    const query = new URLSearchParams(url.slice(queryIndex + 1, queryEnd));
+    query.forEach((value, key) => params.set(key, value));
+  }
 
-    if (accessToken && refreshToken) {
-      return { accessToken, refreshToken };
-    }
+  if (hashIndex >= 0) {
+    const hash = new URLSearchParams(url.slice(hashIndex + 1));
+    hash.forEach((value, key) => params.set(key, value));
+  }
+
+  return params;
+};
+
+export const parseAuthTokensFromUrl = (url: string) => {
+  const params = getUrlSearchParams(url);
+  const accessToken = params.get('access_token');
+  const refreshToken = params.get('refresh_token');
+
+  if (accessToken && refreshToken) {
+    return { accessToken, refreshToken };
   }
 
   return null;
+};
+
+/** PKCE auth code from OAuth redirect (query or hash). */
+export const parseAuthCodeFromUrl = (url: string) => {
+  const code = getUrlSearchParams(url).get('code');
+  return code && code.length > 0 ? code : null;
 };
 
 export const getDefaultWebRedirect = () => DEFAULT_WEB_REDIRECT;

@@ -1,5 +1,5 @@
 import * as Location from 'expo-location';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Bell,
@@ -17,13 +17,23 @@ import {
 } from 'lucide-react-native';
 import { Alert, ScrollView, Text, View } from 'react-native';
 
-import { SettingsRow } from '@/components/settings/SettingsRow';import { SettingsScreenHeader } from '@/components/settings/SettingsScreenHeader';
+import { SettingsRow } from '@/components/settings/SettingsRow';
+import { SettingsScreenHeader } from '@/components/settings/SettingsScreenHeader';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { SettingsToggle } from '@/components/settings/SettingsToggle';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useSignOut } from '@/hooks/useSignOut';
 import type { AppStackParamList } from '@/navigation/types';
+import {
+  isExpoGoClient,
+  syncPushRegistration,
+} from '@/services/notifications/pushRegistration';
+import {
+  getNotificationPreferences,
+  updateNotificationPreferences,
+  type NotificationPreferences,
+} from '@/services/supabase/notificationPreferences';
 import { setDonorMapVisibility } from '@/services/supabase/profiles';
 import { authStyles } from '@/screens/auth/styles';
 import { sanitizeProfileError } from '@/utils/profileErrors';
@@ -33,19 +43,113 @@ type Props = NativeStackScreenProps<AppStackParamList, 'Settings'>;
 
 const APP_VERSION = '1.0.0';
 
+const DEFAULT_NOTIFICATION_PREFS: Pick<
+  NotificationPreferences,
+  'push_enabled' | 'emergency_alerts' | 'message_notifications'
+> = {
+  push_enabled: true,
+  emergency_alerts: true,
+  message_notifications: true,
+};
+
 export function SettingsScreen({ navigation }: Props) {
   const { profile, refreshProfile, session } = useAuth();
   const { clearSignOutError, confirmSignOut, signOutError, signingOut } = useSignOut();
 
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [emergencyAlerts, setEmergencyAlerts] = useState(true);
-  const [messageNotifications, setMessageNotifications] = useState(true);
-  const [locationServices, setLocationServices] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
   const [mapVisibilityLoading, setMapVisibilityLoading] = useState(false);
   const [mapVisibilityError, setMapVisibilityError] = useState<string | null>(null);
+  const [notificationPrefs, setNotificationPrefs] = useState(DEFAULT_NOTIFICATION_PREFS);
+  const [notificationLoadingKey, setNotificationLoadingKey] = useState<string | null>(null);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
+
+  const showComingSoon = (feature: string) => {
+    Alert.alert(feature, 'This preference will be available in a future update.');
+  };
 
   const isDonor = profile?.role === 'donor';
+
+  const loadNotificationPreferences = useCallback(async () => {
+    if (!session?.user.id) {
+      return;
+    }
+
+    const { data, error } = await getNotificationPreferences(session.user.id);
+
+    if (error) {
+      setNotificationError(
+        sanitizeProfileError(error, 'Unable to load notification preferences.'),
+      );
+      return;
+    }
+
+    if (data) {
+      setNotificationPrefs({
+        push_enabled: data.push_enabled,
+        emergency_alerts: data.emergency_alerts,
+        message_notifications: data.message_notifications,
+      });
+      setNotificationError(null);
+    }
+  }, [session?.user.id]);
+
+  useEffect(() => {
+    void loadNotificationPreferences();
+  }, [loadNotificationPreferences]);
+
+  const handleNotificationToggle = async (
+    key: keyof typeof DEFAULT_NOTIFICATION_PREFS,
+    value: boolean,
+  ) => {
+    if (!session?.user.id || notificationLoadingKey) {
+      return;
+    }
+
+    const previous = notificationPrefs;
+    const next = { ...notificationPrefs, [key]: value };
+    setNotificationPrefs(next);
+    setNotificationLoadingKey(key);
+    setNotificationError(null);
+
+    const { data, error } = await updateNotificationPreferences(session.user.id, {
+      [key]: value,
+    });
+
+    if (error) {
+      setNotificationPrefs(previous);
+      setNotificationError(
+        sanitizeProfileError(error, 'Unable to update notification preferences.'),
+      );
+      setNotificationLoadingKey(null);
+      return;
+    }
+
+    if (data) {
+      setNotificationPrefs({
+        push_enabled: data.push_enabled,
+        emergency_alerts: data.emergency_alerts,
+        message_notifications: data.message_notifications,
+      });
+    }
+
+    if (key === 'push_enabled') {
+      const pushResult = await syncPushRegistration(session.user.id, value);
+
+      if (pushResult.error && value) {
+        setNotificationError(pushResult.error.message);
+      } else if (value && pushResult.skippedInExpoGo) {
+        Alert.alert(
+          'Push preference saved',
+          'Remote push is not available in Expo Go on SDK 53+. Your preference is saved; use a development build (`npx expo run:android` / `run:ios`) to register device push tokens.',
+        );
+      }
+    }
+
+    setNotificationLoadingKey(null);
+  };
+
+  const pushSubtitle = isExpoGoClient()
+    ? 'Saved in settings · device push needs a development build'
+    : 'Device alerts for important updates';
 
   const handleMapVisibilityToggle = async (visibleOnMap: boolean) => {
     if (!session?.user.id || mapVisibilityLoading) {
@@ -104,20 +208,11 @@ export function SettingsScreen({ navigation }: Props) {
 
   const confirmDeleteAccount = () => {
     Alert.alert(
-      'Delete account?',
-      'This action is permanent. Your profile, requests, and donation history will be removed.',
+      'Delete account',
+      'Account deletion is handled by BloodLink support to protect healthcare records. Email support@bloodlink.app to request permanent removal of your profile, requests, and donation history.',
       [
         { style: 'cancel', text: 'Cancel' },
-        {
-          style: 'destructive',
-          text: 'Delete account',
-          onPress: () => {
-            Alert.alert(
-              'Contact support',
-              'Account deletion is handled by BloodLink support. Email support@bloodlink.app to continue.',
-            );
-          },
-        },
+        { text: 'OK' },
       ],
     );
   };
@@ -132,9 +227,13 @@ export function SettingsScreen({ navigation }: Props) {
             icon={<Bell color={colors.foreground} size={22} strokeWidth={1.75} />}
             label="Push Notifications"
             showDivider
-            subtitle="Receive app notifications"
+            subtitle={pushSubtitle}
             trailing={
-              <SettingsToggle value={pushNotifications} onValueChange={setPushNotifications} />
+              <SettingsToggle
+                disabled={notificationLoadingKey === 'push_enabled'}
+                value={notificationPrefs.push_enabled}
+                onValueChange={(value) => void handleNotificationToggle('push_enabled', value)}
+              />
             }
             showChevron={false}
           />
@@ -142,22 +241,36 @@ export function SettingsScreen({ navigation }: Props) {
             icon={<Bell color={colors.primary} size={22} strokeWidth={1.75} />}
             label="Emergency Alerts"
             showDivider
-            subtitle="Critical blood request alerts"
+            subtitle="Blood requests, matches, and donations"
             trailing={
-              <SettingsToggle value={emergencyAlerts} onValueChange={setEmergencyAlerts} />
+              <SettingsToggle
+                disabled={notificationLoadingKey === 'emergency_alerts'}
+                value={notificationPrefs.emergency_alerts}
+                onValueChange={(value) => void handleNotificationToggle('emergency_alerts', value)}
+              />
             }
             showChevron={false}
           />
           <SettingsRow
             icon={<MessageSquare color={colors.foreground} size={22} strokeWidth={1.75} />}
             label="Message Notifications"
-            subtitle="New messages from recipients"
+            subtitle="Chat and coordination messages"
             trailing={
-              <SettingsToggle value={messageNotifications} onValueChange={setMessageNotifications} />
+              <SettingsToggle
+                disabled={notificationLoadingKey === 'message_notifications'}
+                value={notificationPrefs.message_notifications}
+                onValueChange={(value) =>
+                  void handleNotificationToggle('message_notifications', value)
+                }
+              />
             }
             showChevron={false}
           />
         </SettingsSection>
+
+        {notificationError ? (
+          <Text style={[authStyles.error, { marginHorizontal: 24 }]}>{notificationError}</Text>
+        ) : null}
 
         <SettingsSection title="Account">
           <SettingsRow
@@ -204,9 +317,13 @@ export function SettingsScreen({ navigation }: Props) {
             icon={<MapPin color={colors.foreground} size={22} strokeWidth={1.75} />}
             label="Location Services"
             showDivider={isDonor}
-            subtitle="Find nearby donors and requests"
-            trailing={<SettingsToggle value={locationServices} onValueChange={setLocationServices} />}
-            showChevron={false}
+            subtitle="Managed by your device settings"
+            onPress={() =>
+              openDetail(
+                'Location Services',
+                'BloodLink uses your device location permission to estimate distance to nearby donors and requests. You can enable or disable location access in your phone settings.',
+              )
+            }
           />
           {isDonor ? (
             <SettingsRow
@@ -228,15 +345,13 @@ export function SettingsScreen({ navigation }: Props) {
             label="Language"
             showDivider
             trailing={<Text style={settingsStyles.rowTrailingText}>English</Text>}
-            onPress={() =>
-              Alert.alert('Language', 'Additional languages will be available in a future update.')
-            }
+            onPress={() => showComingSoon('Language')}
           />
           <SettingsRow
             icon={<Moon color={colors.foreground} size={22} strokeWidth={1.75} />}
             label="Dark Mode"
-            trailing={<SettingsToggle value={darkMode} onValueChange={setDarkMode} />}
-            showChevron={false}
+            subtitle="Coming soon"
+            onPress={() => showComingSoon('Dark Mode')}
           />
         </SettingsSection>
 

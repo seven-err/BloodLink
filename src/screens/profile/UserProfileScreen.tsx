@@ -23,12 +23,14 @@ import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DonorVerificationBadge } from '@/components/donor/DonorVerificationBadge';
+import { ModeToggle } from '@/components/common/ModeToggle';
 import { Skeleton } from '@/components/common/Skeleton';
 import { ProfileAvatar } from '@/components/profile/ProfileAvatar';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { useUserMode, type UserMode } from '@/context/UserModeContext';
 import { useSignOut } from '@/hooks/useSignOut';
-import type { DonorTabParamList } from '@/navigation/DonorTabNavigator';
+import type { AppTabParamList } from '@/navigation/AppTabNavigator';
 import type { AppStackParamList } from '@/navigation/types';
 import { authStyles } from '@/screens/auth/styles';
 import { supabase } from '@/services/supabase/client';
@@ -50,12 +52,10 @@ import { formatRoleLabel } from '@/utils/profileDisplay';
 import { sanitizeProfileError } from '@/utils/profileErrors';
 import { profileScreenStyles as styles } from './profileScreenStyles';
 
-type Props =
-  | CompositeScreenProps<
-      BottomTabScreenProps<DonorTabParamList, 'AppProfile'>,
-      NativeStackScreenProps<AppStackParamList>
-    >
-  | NativeStackScreenProps<AppStackParamList, 'AppProfile'>;
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<AppTabParamList, 'AppProfile'>,
+  NativeStackScreenProps<AppStackParamList>
+>;
 
 const formatDonationDate = (value: string | null) => {
   if (!value) {
@@ -82,6 +82,21 @@ const computeResponseRate = (statuses: string[]) => {
     .length;
 
   return Math.round((positive / responded.length) * 100);
+};
+
+const getModeDisplayLabel = (mode: UserMode) =>
+  mode === 'donate' ? 'Donate' : 'Request';
+
+const getModeSubtitle = (mode: UserMode, role: string | null | undefined) => {
+  if (mode === 'request') {
+    return role === 'recipient'
+      ? 'Finding compatible donors for your requests'
+      : 'Browsing as a requester to find compatible donors';
+  }
+
+  return role === 'donor'
+    ? 'Ready to respond to nearby blood requests'
+    : 'Available to help when donors are needed nearby';
 };
 
 function ProfileSkeleton({ topInset }: { topInset: number }) {
@@ -189,8 +204,8 @@ function RecentDonationRow({ item }: { item: DonorDonationListItem }) {
 
 export function UserProfileScreen({ navigation }: Props) {
   const { top: topInset } = useSafeAreaInsets();
-  const isTabScreen = 'jumpTo' in navigation;
   const { profile, refreshProfile, session } = useAuth();
+  const { mode } = useUserMode();
   const { clearSignOutError, confirmSignOut, signOutError, signingOut } = useSignOut();
 
   const [loading, setLoading] = useState(true);
@@ -385,8 +400,10 @@ export function UserProfileScreen({ navigation }: Props) {
                       <DonorVerificationBadge status={donorVerificationStatus} />
                     ) : null}
                   </View>
-                  <Text style={styles.roleLabel}>{formatRoleLabel(profile.role)}</Text>
-                  {isDonor && profile.blood_type ? (
+                  <Text style={styles.roleLabel}>
+                    {formatRoleLabel(profile.role)} account
+                  </Text>
+                  {profile.blood_type ? (
                     <View style={styles.bloodTypePill}>
                       <Droplet color={colors.primary} fill={colors.primary} size={14} />
                       <Text style={styles.bloodTypePillText}>
@@ -394,6 +411,19 @@ export function UserProfileScreen({ navigation }: Props) {
                       </Text>
                     </View>
                   ) : null}
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+              <View style={styles.modeSection}>
+                <Text style={styles.modeStatusLabel}>
+                  {getModeDisplayLabel(mode)} mode
+                </Text>
+                <Text style={styles.modeSubtitle}>
+                  {getModeSubtitle(mode, profile.role)}
+                </Text>
+                <View style={styles.modeToggleWrap}>
+                  <ModeToggle />
                 </View>
               </View>
 
@@ -488,26 +518,21 @@ export function UserProfileScreen({ navigation }: Props) {
               <ProfileMenuRow
                 icon={<Shield color={colors.primary} size={18} />}
                 label="Privacy & Security"
-                showDivider
+                showDivider={isDonor}
                 onPress={() => navigateToStack('Settings')}
               />
-              <ProfileMenuRow
-                icon={<Award color={colors.primary} size={18} />}
-                label="Achievements"
-                showDivider
-                onPress={() => navigateToStack('MyDonations')}
-              />
+              {isDonor ? (
+                <ProfileMenuRow
+                  icon={<Award color={colors.primary} size={18} />}
+                  label="Donation History"
+                  showDivider
+                  onPress={() => navigateToStack('MyDonations')}
+                />
+              ) : null}
               <ProfileMenuRow
                 icon={<CircleHelp color={colors.primary} size={18} />}
                 label="Help & Support"
-                onPress={() => {
-                  if (isTabScreen && isDonor) {
-                    navigation.getParent()?.navigate('HemieAI');
-                    return;
-                  }
-
-                  navigateToStack('HemieAI');
-                }}
+                onPress={() => navigateToStack('HemieAI')}
               />
             </View>
 

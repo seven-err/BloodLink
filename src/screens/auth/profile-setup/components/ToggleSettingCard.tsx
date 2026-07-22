@@ -27,8 +27,9 @@ export function ToggleSettingCard({
         <Text style={profileSetupStyles.toggleDescription}>{description}</Text>
       </View>
       <Switch
-        thumbColor="#fff"
-        trackColor={{ false: '#d1d5db', true: colors.primary }}
+        accessibilityLabel={title}
+        thumbColor={colors.primaryForeground}
+        trackColor={{ false: colors.border, true: colors.primary }}
         value={value}
         onValueChange={onValueChange}
       />

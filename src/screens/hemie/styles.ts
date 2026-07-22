@@ -9,7 +9,7 @@ export const hemieStyles = StyleSheet.create({
   },
   chatContent: {
     gap: 16,
-    padding: 20,
+    padding: 24,
     paddingBottom: 12,
   },
   disclaimer: {
@@ -49,7 +49,7 @@ export const hemieStyles = StyleSheet.create({
     bottom: 0,
     gap: 10,
     left: 0,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 10,
     position: 'absolute',
     right: 0,
@@ -65,7 +65,7 @@ export const hemieStyles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     paddingBottom: 14,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     paddingTop: 8,
   },
   headerCopy: {
@@ -129,5 +129,15 @@ export const hemieStyles = StyleSheet.create({
   },
   suggestedSection: {
     gap: 10,
+  },
+  typingRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  typingText: {
+    color: colors.muted,
+    fontSize: 14,
+    fontStyle: 'italic',
   },
 });

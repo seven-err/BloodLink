@@ -16,7 +16,7 @@ import { z } from 'zod';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { FormTextInput } from '@/components/forms/FormTextInput';
 import type { AuthStackParamList } from '@/navigation/types';
-import { signInWithEmail } from '@/services/supabase/auth';
+import { signInWithEmail, signInWithGoogle } from '@/services/supabase/auth';
 import { getLoginErrorMessage } from '@/utils/loginErrors';
 import { loginPasswordSchema } from '@/utils/password';
 import { Phone } from 'lucide-react-native';
@@ -27,6 +27,7 @@ import { AuthTabs } from './AuthTabs';
 import { SecurityFooter } from './SecurityFooter';
 import { SocialButton } from './SocialButton';
 import { authStyles } from './styles';
+import { colors } from '@/constants/theme';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -40,6 +41,7 @@ type FormValues = z.infer<typeof schema>;
 export function LoginScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const {
     control,
@@ -63,10 +65,37 @@ export function LoginScreen({ navigation }: Props) {
       if (loginError) {
         setError(getLoginErrorMessage(loginError.message));
       }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Unable to log in.');
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : 'Unable to log in.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onGooglePress = async () => {
+    if (googleLoading || loading) {
+      return;
+    }
+
+    setError(null);
+    setGoogleLoading(true);
+
+    try {
+      const result = await signInWithGoogle();
+
+      if (result.cancelled) {
+        return;
+      }
+
+      if (result.error) {
+        setError(getLoginErrorMessage(result.error.message));
+      }
+    } catch (googleError) {
+      setError(
+        googleError instanceof Error ? googleError.message : 'Unable to sign in with Google.',
+      );
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -91,12 +120,16 @@ export function LoginScreen({ navigation }: Props) {
           onSignup={() => navigation.navigate('Signup')}
         />
         <View style={styles.socials}>
-          <SocialButton 
-            icon={<Phone color="#1f2937" size={20} />} 
-            title="Continue with Phone number" 
+          <SocialButton
+            icon={<Phone color={colors.foreground} size={20} />}
+            title="Continue with Phone number"
             onPress={() => navigation.navigate('EnterPhone', { mode: 'login' })}
           />
-          <SocialButton icon={<SocialIcon name="google" />} title="Continue with Google" />
+          <SocialButton
+            icon={<SocialIcon name="google" />}
+            title={googleLoading ? 'Connecting to Google…' : 'Continue with Google'}
+            onPress={() => void onGooglePress()}
+          />
         </View>
         <AuthDivider />
         <View style={styles.form}>
@@ -170,7 +203,7 @@ const styles = StyleSheet.create({
     marginTop: -4,
   },
   forgot: {
-    color: '#e50914',
+    color: colors.primary,
     fontSize: 13,
   },
   form: {
@@ -181,7 +214,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   screen: {
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.background,
     flex: 1,
   },
   socials: {

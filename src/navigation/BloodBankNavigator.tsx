@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import { colors } from '@/constants/theme';
 import { BloodBankDashboardScreen } from '@/screens/bloodbank/BloodBankDashboardScreen';
 import { BloodBankProfileScreen } from '@/screens/bloodbank/BloodBankProfileScreen';
 import { BloodBankResubmitScreen } from '@/screens/bloodbank/BloodBankResubmitScreen';
@@ -29,9 +30,9 @@ export function BloodBankNavigator({ verificationStatus }: BloodBankNavigatorPro
     <Stack.Navigator
       initialRouteName={initialRouteName}
       screenOptions={{
-        contentStyle: { backgroundColor: '#fef2f2' },
+        contentStyle: { backgroundColor: colors.backgroundTint },
         headerShadowVisible: false,
-        headerTintColor: '#991b1b',
+        headerTintColor: colors.primaryDark,
       }}
     >
       <Stack.Screen

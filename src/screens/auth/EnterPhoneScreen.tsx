@@ -7,7 +7,10 @@ import { z } from 'zod';
 
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { FormTextInput } from '@/components/forms/FormTextInput';
+import { colors } from '@/constants/theme';
 import type { AuthStackParamList } from '@/navigation/types';
+import { signInWithGoogle } from '@/services/supabase/auth';
+import { getLoginErrorMessage } from '@/utils/loginErrors';
 import { normalizePhoneNumber } from '@/utils/phone';
 import { AuthBackButton } from './AuthBackButton';
 import { AuthBrand } from './AuthBrand';
@@ -27,6 +30,8 @@ type FormValues = z.infer<typeof schema>;
 
 export function EnterPhoneScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const {
     control,
     handleSubmit,
@@ -51,6 +56,33 @@ export function EnterPhoneScreen({ navigation, route }: Props) {
     setLoading(false);
   };
 
+  const onGooglePress = async () => {
+    if (googleLoading || loading) {
+      return;
+    }
+
+    setError(null);
+    setGoogleLoading(true);
+
+    try {
+      const result = await signInWithGoogle();
+
+      if (result.cancelled) {
+        return;
+      }
+
+      if (result.error) {
+        setError(getLoginErrorMessage(result.error.message));
+      }
+    } catch (googleError) {
+      setError(
+        googleError instanceof Error ? googleError.message : 'Unable to sign in with Google.',
+      );
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={process.env.EXPO_OS === 'ios' ? 'padding' : 'height'}
@@ -72,7 +104,11 @@ export function EnterPhoneScreen({ navigation, route }: Props) {
           </Text>
         </View>
         <View style={styles.socials}>
-          <SocialButton icon={<SocialIcon name="google" />} title="Continue with Google" />
+          <SocialButton
+            icon={<SocialIcon name="google" />}
+            title={googleLoading ? 'Connecting to Google…' : 'Continue with Google'}
+            onPress={() => void onGooglePress()}
+          />
         </View>
         <AuthDivider />
         <View style={styles.form}>
@@ -93,6 +129,7 @@ export function EnterPhoneScreen({ navigation, route }: Props) {
               />
             )}
           />
+          {error ? <Text style={authStyles.error}>{error}</Text> : null}
           <PrimaryButton loading={loading} title="Continue" onPress={handleSubmit(onSubmit)} />
           <PrimaryButton
             title={route.params.mode === 'signup' ? 'Sign up with email' : 'Login with email'}
@@ -124,7 +161,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   screen: {
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.background,
     flex: 1,
   },
   socials: {

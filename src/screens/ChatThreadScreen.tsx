@@ -207,6 +207,7 @@ export function ChatThreadScreen({ navigation, route }: Props) {
         {!accessDenied ? (
           <PrimaryButton title="Try again" onPress={() => void loadMessages()} />
         ) : null}
+        <PrimaryButton title="Go back" variant="secondary" onPress={() => navigation.goBack()} />
       </View>
     );
   }

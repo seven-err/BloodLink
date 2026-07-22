@@ -99,7 +99,7 @@ export function NearbyDonorDetailScreen({ navigation, route }: Props) {
   ]);
 
   const handleDonorBrowseRequests = () => {
-    navigation.navigate('DonorTabs', { screen: 'DonorRequestFeed' });
+    navigation.navigate('AppTabs', { screen: 'Requests' });
   };
 
   return (

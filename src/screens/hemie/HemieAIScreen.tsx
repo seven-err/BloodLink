@@ -21,6 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import type { AppStackParamList } from '@/navigation/types';
 import { hemieStyles } from '@/screens/hemie/styles';
+import { askHemie, type HemieChatMessage } from '@/services/hemie/chat';
 import {
   getHemieResponse,
   getHemieWelcomeMessage,
@@ -39,6 +40,7 @@ type ChatMessage = {
 const DISCLAIMER_STORAGE_KEY = 'hemie_emergency_disclaimer_hidden';
 const COMPOSER_SPACE = 88;
 const KEYBOARD_COMPOSER_LIFT = 20;
+const WELCOME_TEXT = getHemieWelcomeMessage();
 
 const formatChatTimestamp = () =>
   new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -46,21 +48,33 @@ const formatChatTimestamp = () =>
 let messageCounter = 0;
 const createMessageId = () => `hemie-${Date.now()}-${messageCounter++}`;
 
+const toApiMessages = (chatMessages: ChatMessage[]): HemieChatMessage[] =>
+  chatMessages
+    .filter((message) => message.text !== WELCOME_TEXT)
+    .map((message) => ({
+      role: message.isUser ? 'user' : 'assistant',
+      content: message.text,
+    }));
+
 export function HemieAIScreen({ navigation }: Props) {
   const { bottom: bottomInset, top: topInset } = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
+  const messagesRef = useRef<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
+  const [pending, setPending] = useState(false);
   const [disclaimerVisible, setDisclaimerVisible] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: createMessageId(),
       isUser: false,
-      text: getHemieWelcomeMessage(),
+      text: WELCOME_TEXT,
       timestamp: formatChatTimestamp(),
     },
   ]);
+
+  messagesRef.current = messages;
 
   useEffect(() => {
     void AsyncStorage.getItem(DISCLAIMER_STORAGE_KEY).then((value) => {
@@ -84,11 +98,12 @@ export function HemieAIScreen({ navigation }: Props) {
   const hemieContext = useMemo(
     () => ({
       birthdate: profile?.birthdate,
-      lastTransfusionDate: null,
+      bloodType: profile?.blood_type,
+      lastTransfusionDate: null as string | null,
       role: profile?.role,
       weightKg: profile?.weight_kg,
     }),
-    [profile?.birthdate, profile?.role, profile?.weight_kg],
+    [profile?.birthdate, profile?.blood_type, profile?.role, profile?.weight_kg],
   );
 
   const scrollToBottom = useCallback(() => {
@@ -98,15 +113,15 @@ export function HemieAIScreen({ navigation }: Props) {
   }, []);
 
   useEffect(() => {
-    if (keyboardHeight > 0) {
+    if (keyboardHeight > 0 || pending) {
       scrollToBottom();
     }
-  }, [keyboardHeight, scrollToBottom]);
+  }, [keyboardHeight, pending, scrollToBottom]);
 
   const appendExchange = useCallback(
-    (question: string) => {
+    async (question: string) => {
       const trimmed = question.trim();
-      if (!trimmed) {
+      if (!trimmed || pending) {
         return;
       }
 
@@ -117,27 +132,60 @@ export function HemieAIScreen({ navigation }: Props) {
         timestamp: formatChatTimestamp(),
       };
 
+      setDraft('');
+      setPending(true);
+      setMessages((current) => {
+        const next = [...current, userMessage];
+        messagesRef.current = next;
+        return next;
+      });
+      scrollToBottom();
+
+      let replyText = getHemieResponse(trimmed, hemieContext);
+
+      try {
+        const accessToken = session?.access_token;
+        if (accessToken) {
+          const history = toApiMessages(messagesRef.current);
+          const result = await askHemie({
+            accessToken,
+            context: {
+              birthdate: hemieContext.birthdate,
+              bloodType: hemieContext.bloodType,
+              lastTransfusionDate: hemieContext.lastTransfusionDate,
+              role: hemieContext.role,
+              weightKg: hemieContext.weightKg,
+            },
+            messages: history,
+          });
+          replyText = result.reply;
+        }
+      } catch {
+        replyText = getHemieResponse(trimmed, hemieContext);
+      }
+
       const assistantMessage: ChatMessage = {
         id: createMessageId(),
         isUser: false,
-        text: getHemieResponse(trimmed, hemieContext),
+        text: replyText,
         timestamp: formatChatTimestamp(),
       };
 
-      setMessages((current) => [...current, userMessage, assistantMessage]);
-      setDraft('');
+      setMessages((current) => [...current, assistantMessage]);
+      setPending(false);
       scrollToBottom();
     },
-    [hemieContext, scrollToBottom],
+    [hemieContext, pending, scrollToBottom, session?.access_token],
   );
 
-  const showSuggestedQuestions = messages.length === 1;
+  const showSuggestedQuestions = messages.length === 1 && !pending;
   const keyboardOpen = keyboardHeight > 0;
   const composerBottom = keyboardOpen ? keyboardHeight + KEYBOARD_COMPOSER_LIFT : 0;
   const composerPaddingBottom = keyboardOpen ? 12 : Math.max(bottomInset, 12);
   const scrollBottomInset = keyboardOpen
     ? COMPOSER_SPACE + keyboardHeight + KEYBOARD_COMPOSER_LIFT
     : COMPOSER_SPACE + bottomInset;
+  const canSend = Boolean(draft.trim()) && !pending;
 
   return (
     <View style={hemieStyles.screen}>
@@ -180,7 +228,7 @@ export function HemieAIScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
         style={hemieStyles.chatBody}
         onContentSizeChange={() => {
-          if (keyboardOpen) {
+          if (keyboardOpen || pending) {
             scrollToBottom();
           }
         }}
@@ -195,7 +243,9 @@ export function HemieAIScreen({ navigation }: Props) {
                 <SuggestedQuestionCard
                   key={question}
                   question={question}
-                  onPress={() => appendExchange(question)}
+                  onPress={() => {
+                    void appendExchange(question);
+                  }}
                 />
               ))}
             </View>
@@ -210,14 +260,22 @@ export function HemieAIScreen({ navigation }: Props) {
             timestamp={message.timestamp}
           />
         ))}
+
+        {pending ? (
+          <View style={hemieStyles.typingRow} accessibilityLiveRegion="polite">
+            <HemieAvatar size={36} />
+            <Text style={hemieStyles.typingText}>Hemie is typing...</Text>
+          </View>
+        ) : null}
       </ScrollView>
 
       <View style={[hemieStyles.composerDock, { bottom: composerBottom, paddingBottom: composerPaddingBottom }]}>
         <View style={hemieStyles.footer}>
           <View style={hemieStyles.inputRow}>
             <TextInput
+              editable={!pending}
               multiline
-              placeholder="Ask me anything about blood donation..."
+              placeholder="Ask about blood donation or BloodLink..."
               placeholderTextColor={colors.muted}
               returnKeyType="send"
               style={hemieStyles.input}
@@ -225,14 +283,18 @@ export function HemieAIScreen({ navigation }: Props) {
               blurOnSubmit={false}
               onChangeText={setDraft}
               onFocus={scrollToBottom}
-              onSubmitEditing={() => appendExchange(draft)}
+              onSubmitEditing={() => {
+                void appendExchange(draft);
+              }}
             />
             <Pressable
               accessibilityLabel="Send message"
               accessibilityRole="button"
-              disabled={!draft.trim()}
-              style={[hemieStyles.sendButton, !draft.trim() ? hemieStyles.sendButtonDisabled : null]}
-              onPress={() => appendExchange(draft)}
+              disabled={!canSend}
+              style={[hemieStyles.sendButton, !canSend ? hemieStyles.sendButtonDisabled : null]}
+              onPress={() => {
+                void appendExchange(draft);
+              }}
             >
               <Send color={colors.primaryForeground} size={20} />
             </Pressable>

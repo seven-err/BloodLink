@@ -33,22 +33,6 @@ export const donorRequestFeedStyles = StyleSheet.create({
   chipScroll: {
     flexGrow: 0,
   },
-  createButton: {
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    justifyContent: 'center',
-    minHeight: 40,
-    paddingHorizontal: 14,
-  },
-  createButtonPressed: {
-    opacity: 0.92,
-  },
-  createButtonText: {
-    color: colors.primaryForeground,
-    fontSize: 14,
-    fontWeight: '700',
-  },
   emptyCard: {
     backgroundColor: colors.card,
     borderColor: colors.border,
@@ -92,11 +76,6 @@ export const donorRequestFeedStyles = StyleSheet.create({
     paddingBottom: 14,
     paddingHorizontal: 24,
     paddingTop: 8,
-  },
-  headerActions: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
   },
   mapLinkButton: {
     alignItems: 'center',
@@ -142,8 +121,10 @@ export const donorRequestFeedStyles = StyleSheet.create({
   },
   searchShell: {
     alignItems: 'center',
-    backgroundColor: '#eef2f7',
+    backgroundColor: colors.background,
+    borderColor: colors.border,
     borderRadius: radii.pill,
+    borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
     gap: 8,

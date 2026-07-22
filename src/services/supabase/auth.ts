@@ -1,8 +1,28 @@
 import type { User } from '@supabase/supabase-js';
+import { makeRedirectUri } from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 
-import { getAuthRedirectUrl } from '@/utils/authRedirect';
+import {
+  getAuthRedirectUrl,
+  parseAuthCodeFromUrl,
+  parseAuthTokensFromUrl,
+} from '@/utils/authRedirect';
 
 import { supabase } from './client';
+
+WebBrowser.maybeCompleteAuthSession();
+
+const getOAuthRedirectUrl = () => {
+  if (Platform.OS === 'web') {
+    return getAuthRedirectUrl();
+  }
+
+  return makeRedirectUri({
+    path: 'auth/callback',
+    scheme: 'bloodlink',
+  });
+};
 
 export const signUpWithEmail = (
   email: string,
@@ -50,6 +70,82 @@ export const resendSignupConfirmation = (email: string) =>
 
 export const signInWithEmail = (email: string, password: string) =>
   supabase.auth.signInWithPassword({ email, password });
+
+export type GoogleSignInResult = {
+  cancelled?: boolean;
+  data: Awaited<ReturnType<typeof supabase.auth.setSession>>['data'] | null;
+  error: Error | null;
+};
+
+/** Opens Google OAuth via Supabase + system browser. Requires Google provider enabled in Supabase. */
+export const signInWithGoogle = async (): Promise<GoogleSignInResult> => {
+  const redirectTo = getOAuthRedirectUrl();
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo,
+      skipBrowserRedirect: true,
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'select_account',
+      },
+    },
+  });
+
+  if (error) {
+    return { data: null, error: new Error(error.message) };
+  }
+
+  if (!data.url) {
+    return { data: null, error: new Error('Unable to start Google sign-in.') };
+  }
+
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.location.assign(data.url);
+    return { data: null, error: null };
+  }
+
+  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+  if (result.type === 'cancel' || result.type === 'dismiss') {
+    return { cancelled: true, data: null, error: null };
+  }
+
+  if (result.type !== 'success' || !('url' in result) || !result.url) {
+    return { data: null, error: new Error('Google sign-in did not complete.') };
+  }
+
+  const tokens = parseAuthTokensFromUrl(result.url);
+
+  if (tokens) {
+    const sessionResult = await supabase.auth.setSession({
+      access_token: tokens.accessToken,
+      refresh_token: tokens.refreshToken,
+    });
+
+    return {
+      data: sessionResult.data,
+      error: sessionResult.error ? new Error(sessionResult.error.message) : null,
+    };
+  }
+
+  const code = parseAuthCodeFromUrl(result.url);
+
+  if (code) {
+    const sessionResult = await supabase.auth.exchangeCodeForSession(code);
+
+    return {
+      data: sessionResult.data,
+      error: sessionResult.error ? new Error(sessionResult.error.message) : null,
+    };
+  }
+
+  return {
+    data: null,
+    error: new Error('Google sign-in did not return a valid session.'),
+  };
+};
 
 export const requestPhoneOtp = (phone: string) =>
   supabase.auth.signInWithOtp({

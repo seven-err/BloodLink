@@ -13,6 +13,7 @@ import { z } from 'zod';
 
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { FormTextInput } from '@/components/forms/FormTextInput';
+import { colors } from '@/constants/theme';
 import type { AuthStackParamList } from '@/navigation/types';
 import {
   getSignupErrorMessage,
@@ -283,17 +284,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   screen: {
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.background,
     flex: 1,
   },
   termsText: {
-    color: '#6b7280',
+    color: colors.mutedLight,
     fontSize: 12,
-    textAlign: 'center',
     marginTop: 32,
     paddingHorizontal: 20,
+    textAlign: 'center',
   },
   termsLink: {
-    color: '#e50914',
+    color: colors.primary,
   },
 });

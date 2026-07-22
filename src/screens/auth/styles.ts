@@ -1,53 +1,51 @@
 import { StyleSheet } from 'react-native';
 
+import { colors, radii, shadows } from '@/constants/theme';
+
 export const authStyles = StyleSheet.create({
   actions: {
     gap: 12,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    elevation: 2,
+    backgroundColor: colors.card,
+    borderRadius: radii.cardLg,
     gap: 18,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { height: 2, width: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
+    ...shadows.card,
   },
   container: {
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.background,
     flex: 1,
     justifyContent: 'center',
     padding: 24,
   },
   error: {
-    color: '#dc2626',
+    color: colors.primary,
     fontSize: 14,
   },
   helper: {
-    color: '#6b7280',
+    color: colors.mutedLight,
     fontSize: 14,
     lineHeight: 20,
   },
   success: {
-    color: '#15803d',
+    color: colors.success,
     fontSize: 14,
     lineHeight: 20,
   },
   link: {
-    color: '#b91c1c',
+    color: colors.primaryDark,
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
   },
   subtitle: {
-    color: '#4b5563',
+    color: colors.muted,
     fontSize: 16,
     lineHeight: 24,
   },
   title: {
-    color: '#202124',
+    color: colors.foreground,
     fontSize: 28,
     fontWeight: '800',
   },

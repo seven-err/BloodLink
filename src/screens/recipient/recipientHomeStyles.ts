@@ -93,6 +93,9 @@ export const recipientHomeStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  modeToggleRow: {
+    marginTop: 12,
+  },
   iconButton: {
     alignItems: 'center',
     backgroundColor: colors.background,
@@ -105,6 +108,14 @@ export const recipientHomeStyles = StyleSheet.create({
     color: colors.primary,
     fontSize: 14,
     fontWeight: '700',
+  },
+  loadErrorCard: {
+    backgroundColor: colors.card,
+    borderColor: colors.borderAccent,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 12,
+    padding: 16,
   },
   notificationDot: {
     backgroundColor: colors.primary,

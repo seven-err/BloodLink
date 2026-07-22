@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '@/components/common/PrimaryButton';
+import { colors, radii, shadows } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { signOut } from '@/services/supabase/auth';
 
@@ -32,32 +33,33 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
+    backgroundColor: colors.card,
+    borderRadius: radii.cardLg,
     gap: 10,
     padding: 24,
+    ...shadows.card,
   },
   eyebrow: {
-    color: '#b91c1c',
+    color: colors.primaryDark,
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   screen: {
-    backgroundColor: '#fef2f2',
+    backgroundColor: colors.backgroundTint,
     flex: 1,
     gap: 18,
     justifyContent: 'center',
     padding: 24,
   },
   subtitle: {
-    color: '#4b5563',
+    color: colors.muted,
     fontSize: 16,
     lineHeight: 24,
   },
   title: {
-    color: '#991b1b',
+    color: colors.primaryDark,
     fontSize: 30,
     fontWeight: '800',
   },

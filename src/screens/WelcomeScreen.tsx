@@ -2,6 +2,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Shield, Users, Zap } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import {
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -11,13 +12,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PrimaryButton } from '@/components/common/PrimaryButton';
+import { colors, radii, shadows } from '@/constants/theme';
 import type { AuthStackParamList } from '@/navigation/types';
 
 import bloodlinkLogo from '../assets/images/bloodlink-new-logo.png';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
-
-const PRIMARY = '#E5262A';
 
 type FeatureCardProps = {
   icon: LucideIcon;
@@ -27,7 +28,7 @@ type FeatureCardProps = {
 function FeatureCard({ icon: Icon, label }: FeatureCardProps) {
   return (
     <View style={styles.featureCard}>
-      <Icon color={PRIMARY} size={26} strokeWidth={2} />
+      <Icon color={colors.primary} size={26} strokeWidth={2} />
       <Text style={styles.featureLabel}>{label}</Text>
     </View>
   );
@@ -40,6 +41,13 @@ export function WelcomeScreen({ navigation }: Props) {
 
   const handleExistingAccount = () => {
     navigation.navigate('Login');
+  };
+
+  const openLegalInfo = (title: string) => {
+    Alert.alert(
+      title,
+      `${title} details will open here in a future update. For now, contact support@bloodlink.app with any questions.`,
+    );
   };
 
   return (
@@ -72,18 +80,11 @@ export function WelcomeScreen({ navigation }: Props) {
           </View>
 
           <View style={styles.actions}>
+            <PrimaryButton title="Get Started" onPress={handleGetStarted} />
             <Pressable
               accessibilityRole="button"
-              onPress={handleGetStarted}
-              style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
-            >
-              <Text style={styles.primaryButtonText}>Get Started</Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              onPress={handleExistingAccount}
               style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+              onPress={handleExistingAccount}
             >
               <Text style={styles.secondaryButtonText}>I already have an account</Text>
             </Pressable>
@@ -91,8 +92,21 @@ export function WelcomeScreen({ navigation }: Props) {
 
           <Text style={styles.footer}>
             By continuing, you agree to our{' '}
-            <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-            <Text style={styles.termsLink}>Privacy Policy</Text>
+            <Text
+              accessibilityRole="link"
+              style={styles.termsLink}
+              onPress={() => openLegalInfo('Terms of Service')}
+            >
+              Terms of Service
+            </Text>{' '}
+            and{' '}
+            <Text
+              accessibilityRole="link"
+              style={styles.termsLink}
+              onPress={() => openLegalInfo('Privacy Policy')}
+            >
+              Privacy Policy
+            </Text>
           </Text>
         </View>
       </ScrollView>
@@ -116,22 +130,18 @@ const styles = StyleSheet.create({
   featureCard: {
     alignItems: 'center',
     aspectRatio: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderRadius: 14,
-    elevation: 2,
     flex: 1,
     gap: 10,
     justifyContent: 'center',
     maxHeight: 100,
     paddingHorizontal: 6,
     paddingVertical: 14,
-    shadowColor: '#000000',
-    shadowOffset: { height: 2, width: 0 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    ...shadows.card,
   },
   featureLabel: {
-    color: '#666666',
+    color: colors.muted,
     fontSize: 12,
     fontWeight: '500',
     lineHeight: 15,
@@ -144,17 +154,14 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   footer: {
-    color: '#9ca3af',
+    color: colors.mutedLight,
     fontSize: 11,
     lineHeight: 16,
     paddingHorizontal: 16,
     textAlign: 'center',
   },
-  termsLink: {
-    color: '#e50914',
-  },
   headline: {
-    color: '#000000',
+    color: colors.foreground,
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: -0.3,
@@ -171,20 +178,8 @@ const styles = StyleSheet.create({
     height: 150,
     width: 350,
   },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: PRIMARY,
-    borderRadius: 26,
-    justifyContent: 'center',
-    minHeight: 52,
-  },
-  primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
   safeArea: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     flex: 1,
   },
   scroll: {
@@ -194,28 +189,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 28,
+    paddingHorizontal: 24,
     paddingVertical: 20,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: '#e5e7eb',
-    borderRadius: 26,
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: radii.pill,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 52,
   },
   secondaryButtonText: {
-    color: '#111827',
+    color: colors.foreground,
     fontSize: 16,
     fontWeight: '500',
   },
   subtitle: {
-    color: '#666666',
+    color: colors.muted,
     fontSize: 15,
     lineHeight: 22,
     maxWidth: 310,
     textAlign: 'center',
+  },
+  termsLink: {
+    color: colors.primary,
+    fontWeight: '600',
   },
 });

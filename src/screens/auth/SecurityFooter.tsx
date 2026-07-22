@@ -1,4 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
+
+import { colors } from '@/constants/theme';
 import { AuthIcon } from './icons';
 
 export function SecurityFooter() {
@@ -16,24 +18,24 @@ export function SecurityFooter() {
 const styles = StyleSheet.create({
   footer: {
     alignItems: 'center',
-    backgroundColor: '#fef2f2',
+    backgroundColor: colors.backgroundTint,
     borderRadius: 12,
     flexDirection: 'row',
     gap: 12,
+    marginTop: 8,
     paddingHorizontal: 16,
     paddingVertical: 16,
-    marginTop: 8,
+  },
+  subtitle: {
+    color: colors.mutedLight,
+    fontSize: 13,
+    marginTop: 2,
   },
   textContainer: {
     flex: 1,
   },
-  subtitle: {
-    color: '#6b7280',
-    fontSize: 13,
-    marginTop: 2,
-  },
   title: {
-    color: '#1f2937',
+    color: colors.foreground,
     fontSize: 13,
     fontWeight: '600',
   },

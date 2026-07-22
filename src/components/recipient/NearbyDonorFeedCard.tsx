@@ -9,8 +9,7 @@ type NearbyDonorFeedCardProps = {
   distanceLabel: string;
   isAvailable: boolean;
   name: string;
-  onDetails: () => void;
-  onRespond: () => void;
+  onPress: () => void;
   timeLabel: string;
 };
 
@@ -19,8 +18,7 @@ export function NearbyDonorFeedCard({
   distanceLabel,
   isAvailable,
   name,
-  onDetails,
-  onRespond,
+  onPress,
   timeLabel,
 }: NearbyDonorFeedCardProps) {
   return (
@@ -55,31 +53,19 @@ export function NearbyDonorFeedCard({
         </View>
       </View>
 
-      <View style={styles.actions}>
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.respondButton, pressed ? styles.buttonPressed : null]}
-          onPress={onRespond}
-        >
-          <Text style={styles.respondText}>Respond</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.detailsButton, pressed ? styles.buttonPressed : null]}
-          onPress={onDetails}
-        >
-          <Text style={styles.detailsText}>Details</Text>
-        </Pressable>
-      </View>
+      <Pressable
+        accessibilityLabel={`View donor ${name}`}
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.primaryButton, pressed ? styles.buttonPressed : null]}
+        onPress={onPress}
+      >
+        <Text style={styles.primaryText}>View donor</Text>
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  actions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
   buttonPressed: {
     opacity: 0.9,
   },
@@ -91,22 +77,6 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 16,
     ...shadows.card,
-  },
-  detailsButton: {
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: 12,
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: 12,
-  },
-  detailsText: {
-    color: colors.foreground,
-    fontSize: 15,
-    fontWeight: '700',
   },
   headerCopy: {
     flex: 1,
@@ -130,16 +100,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 4,
   },
-  respondButton: {
+  primaryButton: {
     alignItems: 'center',
     backgroundColor: colors.primary,
     borderRadius: 12,
-    flex: 1,
     justifyContent: 'center',
     minHeight: 44,
     paddingHorizontal: 12,
   },
-  respondText: {
+  primaryText: {
     color: colors.primaryForeground,
     fontSize: 15,
     fontWeight: '700',

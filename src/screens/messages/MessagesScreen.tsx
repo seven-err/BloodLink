@@ -15,11 +15,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HemieFloatingButton } from '@/components/hemie/HemieFloatingButton';
 import { ConversationListItem } from '@/components/messages/ConversationListItem';
+import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { Skeleton } from '@/components/common/Skeleton';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import type { DonorTabParamList } from '@/navigation/DonorTabNavigator';
-import type { RecipientTabParamList } from '@/navigation/RecipientTabNavigator';
+import type { AppTabParamList } from '@/navigation/AppTabNavigator';
 import type { AppStackParamList } from '@/navigation/types';
 import { messagesStyles } from '@/screens/messages/styles';
 import {
@@ -28,8 +28,7 @@ import {
 } from '@/services/supabase/messages';
 
 type Props = CompositeScreenProps<
-  | BottomTabScreenProps<DonorTabParamList, 'DonorMessages'>
-  | BottomTabScreenProps<RecipientTabParamList, 'RecipientMessages'>,
+  BottomTabScreenProps<AppTabParamList, 'Chat'>,
   NativeStackScreenProps<AppStackParamList>
 >;
 
@@ -176,6 +175,7 @@ export function MessagesScreen({ navigation }: Props) {
           error ? (
             <View style={messagesStyles.emptyCard}>
               <Text style={messagesStyles.emptyText}>{error}</Text>
+              <PrimaryButton title="Try again" onPress={() => void loadConversations()} />
             </View>
           ) : searchQuery.trim() ? (
             <View style={messagesStyles.emptyCard}>

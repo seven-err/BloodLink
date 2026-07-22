@@ -4,17 +4,20 @@ import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AlertCircle, Bell, Clock, Plus, Users } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BloodTypeBadge } from '@/components/bloodRequest/BloodTypeBadge';
 import { DonorStatCard } from '@/components/donor/DonorStatCard';
 import { NearbyDonorFeedCard } from '@/components/recipient/NearbyDonorFeedCard';
+import { ModeToggle } from '@/components/common/ModeToggle';
+import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { Skeleton } from '@/components/common/Skeleton';
+import { HemieFloatingButton } from '@/components/hemie/HemieFloatingButton';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useForegroundLocation } from '@/hooks/useForegroundLocation';
-import type { RecipientTabParamList } from '@/navigation/RecipientTabNavigator';
+import type { AppTabParamList } from '@/navigation/AppTabNavigator';
 import type { AppStackParamList } from '@/navigation/types';
 import { recipientHomeStyles } from '@/screens/recipient/recipientHomeStyles';
 import { getMyBloodRequests } from '@/services/supabase/bloodRequests';
@@ -31,7 +34,7 @@ import { formatLastDonationLabel } from '@/utils/donorMapDisplay';
 import { sanitizeProfileError } from '@/utils/profileErrors';
 
 type Props = CompositeScreenProps<
-  BottomTabScreenProps<RecipientTabParamList, 'RecipientHome'>,
+  BottomTabScreenProps<AppTabParamList, 'Home'>,
   NativeStackScreenProps<AppStackParamList>
 >;
 
@@ -84,8 +87,14 @@ function RecipientHomeSkeleton({ topInset }: { topInset: number }) {
   return (
     <View style={recipientHomeStyles.screen}>
       <View style={[recipientHomeStyles.header, { paddingTop: topInset + 8 }]}>
-        <Skeleton height={28} width="55%" />
-        <Skeleton height={16} style={{ marginTop: 8 }} width="30%" />
+        <View style={recipientHomeStyles.headerRow}>
+          <View style={{ flex: 1, gap: 8 }}>
+            <Skeleton height={28} width="70%" />
+            <Skeleton height={16} width="40%" />
+          </View>
+          <Skeleton borderRadius={999} height={40} width={40} />
+        </View>
+        <Skeleton borderRadius={999} height={42} style={recipientHomeStyles.modeToggleRow} width="100%" />
       </View>
       <View style={[recipientHomeStyles.scrollContent, { paddingTop: 24 }]}>
         <Skeleton borderRadius={16} height={160} width="100%" />
@@ -111,8 +120,9 @@ export function RecipientHomeScreen({ navigation }: Props) {
   const [nearbyDonors, setNearbyDonors] = useState<NearbyMapDonorItem[]>([]);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const { coordinates: gpsCoordinates } = useForegroundLocation();
+  const { coordinates: gpsCoordinates, requestLocation } = useForegroundLocation();
 
   const firstName = getFirstName(profile?.full_name);
 
@@ -146,13 +156,15 @@ export function RecipientHomeScreen({ navigation }: Props) {
       }));
   }, [nearbyDonors, profile?.blood_type]);
 
-  const loadHomeData = useCallback(async () => {
+  const loadHomeData = useCallback(async (isRefresh = false) => {
     if (!session?.user.id) {
       setInitialLoading(false);
       return;
     }
 
-    if (!hasLoadedOnceRef.current) {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else if (!hasLoadedOnceRef.current) {
       setInitialLoading(true);
     }
 
@@ -201,14 +213,16 @@ export function RecipientHomeScreen({ navigation }: Props) {
       setLoadError(sanitizeProfileError(error, 'Unable to load recipient home data.'));
     } finally {
       setInitialLoading(false);
+      setRefreshing(false);
       hasLoadedOnceRef.current = true;
     }
   }, [originCoordinates, session?.user.id]);
 
   useFocusEffect(
     useCallback(() => {
+      void requestLocation();
       void loadHomeData();
-    }, [loadHomeData]),
+    }, [loadHomeData, requestLocation]),
   );
 
   const openDonorDetail = (donor: NearbyMapDonorItem) => {
@@ -239,9 +253,17 @@ export function RecipientHomeScreen({ navigation }: Props) {
             {hasUnreadNotifications ? <View style={recipientHomeStyles.notificationDot} /> : null}
           </Pressable>
         </View>
+        <View style={recipientHomeStyles.modeToggleRow}>
+          <ModeToggle showHint />
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={recipientHomeStyles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={recipientHomeStyles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => void loadHomeData(true)} />
+        }
+      >
         <View style={recipientHomeStyles.emergencyCard}>
           <View style={recipientHomeStyles.emergencyHeader}>
             <View style={{ flex: 1, gap: 6 }}>
@@ -253,6 +275,7 @@ export function RecipientHomeScreen({ navigation }: Props) {
             <AlertCircle color={colors.primaryForeground} size={24} />
           </View>
           <Pressable
+            accessibilityLabel="Create blood request"
             accessibilityRole="button"
             style={({ pressed }) => [
               recipientHomeStyles.emergencyButton,
@@ -280,6 +303,7 @@ export function RecipientHomeScreen({ navigation }: Props) {
             <View style={recipientHomeStyles.bloodTypeFooter}>
               <View />
               <Pressable
+                accessibilityLabel="View profile details"
                 accessibilityRole="button"
                 onPress={() => navigation.navigate('AppProfile')}
               >
@@ -305,14 +329,20 @@ export function RecipientHomeScreen({ navigation }: Props) {
           />
         </View>
 
-        {loadError ? <Text style={recipientHomeStyles.errorText}>{loadError}</Text> : null}
+        {loadError ? (
+          <View style={recipientHomeStyles.loadErrorCard}>
+            <Text style={recipientHomeStyles.errorText}>{loadError}</Text>
+            <PrimaryButton title="Try again" onPress={() => void loadHomeData()} />
+          </View>
+        ) : null}
 
         <View style={recipientHomeStyles.sectionHeader}>
           <Text style={recipientHomeStyles.sectionTitle}>Available Donors Nearby</Text>
           <Pressable
+            accessibilityLabel="View all donors on map"
             accessibilityRole="button"
             style={recipientHomeStyles.viewAllButton}
-            onPress={() => navigation.navigate('RecipientMap')}
+            onPress={() => navigation.navigate('Map')}
           >
             <Text style={recipientHomeStyles.linkText}>View All</Text>
           </Pressable>
@@ -324,11 +354,12 @@ export function RecipientHomeScreen({ navigation }: Props) {
               <Text style={recipientHomeStyles.bloodTypeMeta}>
                 Turn on location to see compatible donors near you.
               </Text>
+              <PrimaryButton title="Enable location" onPress={() => void requestLocation()} />
             </View>
           ) : nearbyDonorPreview.length === 0 ? (
             <View style={recipientHomeStyles.bloodTypeCard}>
               <Text style={recipientHomeStyles.bloodTypeMeta}>
-                No compatible donors nearby right now. Try again later or browse the map.
+                No compatible donors nearby right now. Pull down to refresh or browse the map.
               </Text>
             </View>
           ) : (
@@ -340,13 +371,14 @@ export function RecipientHomeScreen({ navigation }: Props) {
                 isAvailable={donor.isAvailable}
                 name={donor.fullName}
                 timeLabel={donor.timeLabel}
-                onDetails={() => openDonorDetail(donor)}
-                onRespond={() => openDonorDetail(donor)}
+                onPress={() => openDonorDetail(donor)}
               />
             ))
           )}
         </View>
       </ScrollView>
+
+      <HemieFloatingButton onPress={() => navigation.getParent()?.navigate('HemieAI')} />
     </View>
   );
 }
