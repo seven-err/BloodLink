@@ -14,6 +14,45 @@ export const getLoginErrorMessage = (message: string) => {
   }
 
   if (
+    normalized.includes('not in this app binary') ||
+    normalized.includes('development build') ||
+    normalized.includes('expo go')
+  ) {
+    return 'In-app Google Sign-In needs a rebuilt BloodLink app. Install a new development build, then open that app (not Expo Go).';
+  }
+
+  if (normalized.includes('developer error') || normalized.includes('sha-1')) {
+    return 'Google Sign-In is misconfigured for this build. Add this app’s SHA-1 fingerprint to the Android OAuth client in Google Cloud Console (package com.sevenerr.BloodLink).';
+  }
+
+  if (
+    normalized.includes('missing expo_public_google_web_client_id') ||
+    normalized.includes('google_web_client_id')
+  ) {
+    return 'Google Sign-In is not configured. Add EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID to your .env file.';
+  }
+
+  if (
+    normalized.includes('provider is not enabled') ||
+    normalized.includes('unsupported provider') ||
+    normalized.includes('validation_failed')
+  ) {
+    return 'Google sign-in is not enabled yet. Ask an admin to enable the Google provider in Supabase Auth.';
+  }
+
+  if (
+    normalized.includes('redirect_uri_mismatch') ||
+    normalized.includes('redirect url') ||
+    normalized.includes('redirect_to')
+  ) {
+    return 'Google sign-in redirect is misconfigured. Add bloodlink://auth/callback (and your web origin) under Supabase Auth URL configuration.';
+  }
+
+  if (normalized.includes('access_denied') || normalized.includes('user cancelled')) {
+    return 'Google sign-in was cancelled.';
+  }
+
+  if (
     normalized.includes('native module is null') ||
     normalized.includes('asyncstorageerror') ||
     normalized.includes('auto refresh tick failed')

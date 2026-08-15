@@ -1,4 +1,7 @@
-require('dotenv').config();
+require('dotenv').config({
+  path: require('path').join(__dirname, '.env'),
+  override: true,
+});
 
 const crypto = require('crypto');
 const cors = require('cors');
@@ -6,10 +9,16 @@ const express = require('express');
 const nodemailer = require('nodemailer');
 const {
   generateHemieReply,
+  getLlmConfig,
+  isLlmConfigured,
   sanitizeContext,
   sanitizeMessages,
   verifySupabaseAccessToken,
 } = require('./hemieChat');
+const {
+  getUserPushTokens,
+  sendExpoPushNotifications,
+} = require('./pushService');
 
 const port = Number(process.env.PORT || 3001);
 const DEFAULT_RATE_LIMIT_MAX = 30;
@@ -219,7 +228,16 @@ function createApp({
   app.use(express.json({ limit: '20kb' }));
 
   app.get('/health', (_req, res) => {
-    res.json({ status: 'ok' });
+    const llm = getLlmConfig(process.env);
+
+    res.json({
+      status: 'ok',
+      hemie: {
+        llmConfigured: isLlmConfigured(process.env),
+        provider: isLlmConfigured(process.env) ? llm.provider : null,
+        model: isLlmConfigured(process.env) ? llm.models[0] : null,
+      },
+    });
   });
 
   const hemieRateLimit = {
@@ -269,6 +287,120 @@ function createApp({
       console.error('Hemie chat failed:', error);
       return res.status(500).json({
         message: 'Hemie is temporarily unavailable. Please try again.',
+      });
+    }
+  });
+
+  app.post('/push/send', createRateLimiter(rateLimit), async (req, res) => {
+    const authorization = req.get('authorization') || '';
+    const accessToken = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+    const providedApiKey = req.get('x-email-api-key') || req.get('x-api-key');
+
+    let isAuthorized = false;
+
+    if (providedApiKey && apiKey && providedApiKey === apiKey) {
+      isAuthorized = true;
+    } else if (accessToken) {
+      try {
+        await verifySupabaseAccessToken(accessToken);
+        isAuthorized = true;
+      } catch (error) {
+        const status = Number(error?.status) || 401;
+        return res.status(status).json({
+          message: error?.message || 'Authentication failed.',
+        });
+      }
+    }
+
+    if (!isAuthorized) {
+      return res.status(401).json({
+        message: 'Authentication required.',
+      });
+    }
+
+    const { body, data, title, tokens: explicitTokens, userId, userIds } = req.body || {};
+
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({
+        message: 'Notification title is required.',
+      });
+    }
+
+    if (!body || typeof body !== 'string' || !body.trim()) {
+      return res.status(400).json({
+        message: 'Notification body is required.',
+      });
+    }
+
+    let targetTokens = Array.isArray(explicitTokens) ? [...explicitTokens] : [];
+
+    const targetUserIds = [
+      ...(Array.isArray(userIds) ? userIds : []),
+      ...(userId && typeof userId === 'string' ? [userId] : []),
+    ];
+
+    if (targetUserIds.length > 0) {
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseKey) {
+        return res.status(500).json({
+          message: 'Supabase is not configured on the server to query push tokens.',
+        });
+      }
+
+      try {
+        for (const uid of targetUserIds) {
+          const userTokens = await getUserPushTokens(uid, {
+            apiKey: supabaseKey,
+            accessToken: process.env.SUPABASE_SERVICE_ROLE_KEY ? undefined : accessToken,
+            supabaseUrl,
+          });
+          targetTokens.push(...userTokens);
+        }
+      } catch (error) {
+        console.error('Failed to resolve target user push tokens:', error);
+        return res.status(500).json({
+          message: 'Failed to retrieve push tokens for target user(s).',
+        });
+      }
+    }
+
+    // Deduplicate tokens
+    targetTokens = Array.from(new Set(targetTokens));
+
+    if (targetTokens.length === 0) {
+      return res.json({
+        count: 0,
+        message: 'No push tokens found for recipient(s).',
+        success: true,
+      });
+    }
+
+    const messages = targetTokens.map((token) => ({
+      body: body.trim(),
+      channelId: 'bloodlink-default',
+      data: data && typeof data === 'object' ? data : {},
+      priority: 'high',
+      sound: 'default',
+      title: title.trim(),
+      to: token,
+    }));
+
+    try {
+      const result = await sendExpoPushNotifications(messages, {
+        expoAccessToken: process.env.EXPO_ACCESS_TOKEN,
+      });
+
+      return res.json({
+        count: targetTokens.length,
+        success: true,
+        tickets: result?.data || [],
+      });
+    } catch (error) {
+      console.error('Expo push dispatch failed:', error);
+      return res.status(500).json({
+        message: error?.message || 'Failed to dispatch push notifications.',
       });
     }
   });

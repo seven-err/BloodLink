@@ -5,10 +5,13 @@ export const MAX_DONOR_WEIGHT_KG = 180;
 const MIN_WEIGHT_KG = MIN_DONOR_WEIGHT_KG;
 const TRANSFUSION_WAIT_MONTHS = 12;
 
+export const DONATION_INTERVAL_DAYS = 56;
+
 export const DONOR_ELIGIBILITY_REQUIREMENTS = [
   'Age: 16 to 65 years old (16 and 17-year-olds require written parental or guardian consent).',
   'Weight: At least 50 kg (110 lbs) to safely donate a standard 350ml or 450ml blood bag.',
   'Wait 12 months from the date of your last blood transfusion before donating.',
+  `Wait ${DONATION_INTERVAL_DAYS} days between whole-blood donations.`,
   'Be in good general health on the day of donation.',
 ] as const;
 

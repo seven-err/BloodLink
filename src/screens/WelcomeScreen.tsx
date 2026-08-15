@@ -1,47 +1,155 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Shield, Users, Zap } from 'lucide-react-native';
+import { Hospital, Shield, Users, Zap } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import {
-  Alert,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { useEffect } from 'react';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  interpolate,
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
+import type { SharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PrimaryButton } from '@/components/common/PrimaryButton';
-import { colors, radii, shadows } from '@/constants/theme';
+import { colors, radii } from '@/constants/theme';
 import type { AuthStackParamList } from '@/navigation/types';
 
 import bloodlinkLogo from '../assets/images/bloodlink-new-logo.png';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
 
-type FeatureCardProps = {
+// Orbit geometry
+const ORBIT_RADIUS = 112;
+const BADGE_ITEMS: { icon: LucideIcon; label: string; offset: number }[] = [
+  { icon: Shield, label: 'Verified Donors', offset: 0 },
+  { icon: Zap, label: 'Emergency Alerts', offset: (2 * Math.PI) / 3 },
+  { icon: Users, label: 'Compatible Matches', offset: (4 * Math.PI) / 3 },
+];
+
+// ─── OrbitBadge ──────────────────────────────────────────────────────────────
+type OrbitBadgeProps = {
   icon: LucideIcon;
   label: string;
+  angularOffset: number;
+  orbit: SharedValue<number>;
 };
 
-function FeatureCard({ icon: Icon, label }: FeatureCardProps) {
+function OrbitBadge({ icon: Icon, label, angularOffset, orbit }: OrbitBadgeProps) {
+  const animStyle = useAnimatedStyle(() => {
+    const angle = orbit.value + angularOffset;
+    const tx = ORBIT_RADIUS * Math.sin(angle);
+    const ty = -ORBIT_RADIUS * Math.cos(angle);
+    return {
+      transform: [{ translateX: tx }, { translateY: ty }],
+    };
+  });
+
   return (
-    <View style={styles.featureCard}>
-      <Icon color={colors.primary} size={26} strokeWidth={2} />
-      <Text style={styles.featureLabel}>{label}</Text>
-    </View>
+    <Animated.View pointerEvents="none" style={[styles.badgeAnchor, animStyle]}>
+      <View style={styles.orbitBadge}>
+        <View style={styles.badgeIconCircle}>
+          <Icon color={colors.primary} size={11} strokeWidth={2.6} />
+        </View>
+        <Text numberOfLines={1} style={styles.badgeLabel}>
+          {label}
+        </Text>
+      </View>
+    </Animated.View>
   );
 }
 
-export function WelcomeScreen({ navigation }: Props) {
-  const handleGetStarted = () => {
-    navigation.navigate('Signup');
-  };
+// ─── PulseRing ───────────────────────────────────────────────────────────────
+type PulseRingProps = {
+  delay: number;
+  size: number;
+};
 
-  const handleExistingAccount = () => {
-    navigation.navigate('Login');
-  };
+function PulseRing({ delay, size }: PulseRingProps) {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withDelay(
+      delay,
+      withRepeat(
+        withTiming(1, { duration: 2800, easing: Easing.out(Easing.ease) }),
+        -1,
+        false,
+      ),
+    );
+  }, [delay, progress]);
+
+  const animStyle = useAnimatedStyle(() => {
+    const scale = interpolate(progress.value, [0, 1], [0.7, 1.85]);
+    const opacity = interpolate(progress.value, [0, 0.5, 1], [0.55, 0.2, 0]);
+    return {
+      opacity,
+      transform: [{ scale }],
+    };
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.pulseRingBase,
+        { borderRadius: size / 2, height: size, width: size },
+        animStyle,
+      ]}
+    />
+  );
+}
+
+// ─── WelcomeScreen ───────────────────────────────────────────────────────────
+export function WelcomeScreen({ navigation }: Props) {
+  // Shared value for orbit angle: 0 → 2π over 20 seconds, looped
+  const orbit = useSharedValue(0);
+
+  // Hospital hub subtle scale-breathe
+  const hubBreath = useSharedValue(1);
+
+  useEffect(() => {
+    // Continuous orbit on the UI thread — silky smooth
+    orbit.value = withRepeat(
+      withTiming(2 * Math.PI, {
+        duration: 50000, // Increased from 20000 to make the orbit slower (30 seconds per rotation)
+        easing: Easing.linear,
+      }),
+      -1,
+      false,
+    );
+
+    // Gentle hub breathing
+    hubBreath.value = withRepeat(
+      withSequence(
+        withTiming(1.05, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1.0, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+      false,
+    );
+  }, [orbit, hubBreath]);
+
+  // Derive the orbit guide ring angle for a subtle slow counter-rotate effect
+  const ringRotation = useDerivedValue(() => `${-orbit.value * 0.15}rad`);
+
+  const hubStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: hubBreath.value }],
+  }));
+
+  const orbitRingStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: ringRotation.value }],
+  }));
+
+  const handleGetStarted = () => navigation.navigate('Signup');
+  const handleExistingAccount = () => navigation.navigate('Login');
 
   const openLegalInfo = (title: string) => {
     Alert.alert(
@@ -58,27 +166,50 @@ export function WelcomeScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
         style={styles.scroll}
       >
-        <View style={styles.content}>
-          <View style={styles.hero}>
-            <Image
-              accessibilityLabel="BloodLink logo"
-              resizeMode="contain"
-              source={bloodlinkLogo}
-              style={styles.logo}
+        {/* ── Hero ── */}
+        <Animated.View entering={FadeInDown.delay(60).duration(600).springify()} style={styles.heroSection}>
+          <Image
+            accessibilityLabel="BloodLink logo"
+            resizeMode="contain"
+            source={bloodlinkLogo}
+            style={styles.logo}
+          />
+          <View style={styles.textContainer}>
+            <Text style={styles.headline}>Find compatible blood{'\n'}donors faster</Text>
+          </View>
+        </Animated.View>
+
+        {/* ── Orbit Stage ── */}
+        <Animated.View entering={FadeIn.delay(100).duration(700)} style={styles.orbitStage}>
+          {/* Slow-rotating dashed orbit guide */}
+          <Animated.View style={[styles.orbitRing, orbitRingStyle]} />
+
+          {/* Radial pulse rings */}
+          <PulseRing delay={0} size={112} />
+          <PulseRing delay={900} size={112} />
+
+          {/* Hospital hub - Much bigger */}
+          <Animated.View style={[styles.hospitalHub, hubStyle]}>
+            <Hospital color={colors.primary} size={44} strokeWidth={2.3} />
+          </Animated.View>
+
+          {/* Orbiting badges - Compact & smaller */}
+          {BADGE_ITEMS.map((item) => (
+            <OrbitBadge
+              angularOffset={item.offset}
+              icon={item.icon}
+              key={item.label}
+              label={item.label}
+              orbit={orbit}
             />
+          ))}
+        </Animated.View>
 
-            <Text style={styles.headline}>Find compatible blood donors faster</Text>
-            <Text style={styles.subtitle}>
-              Emergency blood donor matching system connecting donors with those in critical need
-            </Text>
-          </View>
-
-          <View style={styles.featureRow}>
-            <FeatureCard icon={Shield} label="Verified Donors" />
-            <FeatureCard icon={Zap} label="Emergency Alerts" />
-            <FeatureCard icon={Users} label="Secure Health Data" />
-          </View>
-
+        {/* ── CTA ── */}
+        <Animated.View
+          entering={FadeInDown.delay(500).duration(600).springify()}
+          style={styles.bottomSection}
+        >
           <View style={styles.actions}>
             <PrimaryButton title="Get Started" onPress={handleGetStarted} />
             <Pressable
@@ -108,7 +239,7 @@ export function WelcomeScreen({ navigation }: Props) {
               Privacy Policy
             </Text>
           </Text>
-        </View>
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -117,69 +248,116 @@ export function WelcomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   actions: {
     gap: 12,
-    marginBottom: 28,
+    width: '100%',
+  },
+  badgeAnchor: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
+  },
+  badgeIconCircle: {
+    alignItems: 'center',
+    backgroundColor: colors.primarySoft,
+    borderRadius: 10,
+    height: 20,
+    justifyContent: 'center',
+    width: 20,
+  },
+  badgeLabel: {
+    color: '#1e293b',
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  bottomSection: {
+    gap: 18,
+    paddingTop: 4,
     width: '100%',
   },
   buttonPressed: {
-    opacity: 0.92,
-  },
-  content: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  featureCard: {
-    alignItems: 'center',
-    aspectRatio: 1,
-    backgroundColor: colors.card,
-    borderRadius: 14,
-    flex: 1,
-    gap: 10,
-    justifyContent: 'center',
-    maxHeight: 100,
-    paddingHorizontal: 6,
-    paddingVertical: 14,
-    ...shadows.card,
-  },
-  featureLabel: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '500',
-    lineHeight: 15,
-    textAlign: 'center',
-  },
-  featureRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 36,
-    width: '100%',
+    opacity: 0.82,
+    transform: [{ scale: 0.985 }],
   },
   footer: {
     color: colors.mutedLight,
-    fontSize: 11,
-    lineHeight: 16,
-    paddingHorizontal: 16,
+    fontSize: 10,
+    lineHeight: 18,
+    paddingHorizontal: 12,
     textAlign: 'center',
   },
   headline: {
     color: colors.foreground,
-    fontSize: 28,
+    fontSize: 35,
     fontWeight: '700',
-    letterSpacing: -0.3,
-    lineHeight: 34,
+    letterSpacing: -0.6,
+    lineHeight: 45,
     textAlign: 'center',
   },
-  hero: {
+  heroSection: {
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 20,
+    gap: 20,
     width: '100%',
   },
+  hospitalHub: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderColor: '#fecaca',
+    borderRadius: 46,
+    borderWidth: 2,
+    elevation: 8,
+    height: 92,
+    justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { height: 6, width: 0 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    width: 92,
+  },
   logo: {
-    height: 150,
-    width: 350,
+    height: 110,
+    maxWidth: 280,
+    width: '100%',
+  },
+  orbitBadge: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderColor: 'rgba(226,232,240,0.85)',
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    elevation: 4,
+    flexDirection: 'row',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    shadowColor: '#0f172a',
+    shadowOffset: { height: 3, width: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  orbitRing: {
+    borderColor: 'rgba(254,202,202,0.7)',
+    borderRadius: ORBIT_RADIUS,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    height: ORBIT_RADIUS * 2,
+    position: 'absolute',
+    width: ORBIT_RADIUS * 2,
+  },
+  orbitStage: {
+    alignItems: 'center',
+    height: (ORBIT_RADIUS + 22) * 2,
+    justifyContent: 'center',
+    marginVertical: 6,
+    overflow: 'visible',
+    position: 'relative',
+    width: '100%',
+  },
+  pulseRingBase: {
+    backgroundColor: colors.primarySoft,
+    position: 'absolute',
   },
   safeArea: {
-    backgroundColor: colors.card,
+    backgroundColor: '#fff',
     flex: 1,
   },
   scroll: {
@@ -188,33 +366,32 @@ const styles = StyleSheet.create({
   scrollContent: {
     alignItems: 'center',
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 20,
     paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingTop: 32,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: colors.card,
+    backgroundColor: '#f8fafc',
     borderColor: colors.border,
-    borderRadius: radii.pill,
+    borderRadius: radii.card,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 52,
   },
   secondaryButtonText: {
-    color: colors.foreground,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  subtitle: {
-    color: colors.muted,
+    color: '#334155',
     fontSize: 15,
-    lineHeight: 22,
-    maxWidth: 310,
-    textAlign: 'center',
+    fontWeight: '600',
   },
+
   termsLink: {
     color: colors.primary,
     fontWeight: '600',
+  },
+  textContainer: {
+    alignItems: 'center',
+    gap: 8,
   },
 });

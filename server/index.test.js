@@ -149,3 +149,57 @@ test('sends supported template emails with backend-owned content', async () => {
   assert.equal(sentMail[0].to, 'recipient@example.com');
   assert.match(sentMail[0].html, /&lt;Juan&gt;/);
 });
+
+test('rejects unauthenticated push notification requests', async () => {
+  const response = await fetch(`${baseUrl}/push/send`, {
+    body: JSON.stringify({
+      body: 'Urgent blood request',
+      title: 'BloodLink Alert',
+      tokens: ['ExponentPushToken[mock-token-12345]'],
+    }),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    method: 'POST',
+  });
+
+  assert.equal(response.status, 401);
+});
+
+test('rejects push notification requests with missing title or body', async () => {
+  const response = await fetch(`${baseUrl}/push/send`, {
+    body: JSON.stringify({
+      title: '',
+      tokens: ['ExponentPushToken[mock-token-12345]'],
+    }),
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Api-Key': apiKey,
+    },
+    method: 'POST',
+  });
+
+  assert.equal(response.status, 400);
+  const data = await response.json();
+  assert.match(data.message, /title is required/i);
+});
+
+test('handles push notification sending with explicit tokens', async () => {
+  const response = await fetch(`${baseUrl}/push/send`, {
+    body: JSON.stringify({
+      body: 'Blood request nearby',
+      title: 'BloodLink Alert',
+      tokens: [],
+    }),
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Api-Key': apiKey,
+    },
+    method: 'POST',
+  });
+
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.success, true);
+  assert.equal(data.count, 0);
+});

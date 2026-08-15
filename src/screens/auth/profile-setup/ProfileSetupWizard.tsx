@@ -8,6 +8,7 @@ import { FormTextInput } from '@/components/forms/FormTextInput';
 import { BLOOD_TYPES } from '@/constants/bloodTypes';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { getHighAccuracyPosition } from '@/services/location/getHighAccuracyPosition';
 import { completeProfile } from '@/services/supabase/profiles';
 import type { BloodType, OnboardingRole } from '@/types/database';
 import { getDonorEligibilityIssues } from '@/utils/donorEligibility';
@@ -127,9 +128,7 @@ export function ProfileSetupWizard() {
       return;
     }
 
-    const currentPosition = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    });
+    const currentPosition = await getHighAccuracyPosition();
 
     setCoordinates({
       latitude: currentPosition.coords.latitude,

@@ -6,7 +6,7 @@ import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { OtpInput } from '@/components/forms/OtpInput';
 import { colors } from '@/constants/theme';
 import type { AuthStackParamList } from '@/navigation/types';
-import { bypassPhoneAuth } from '@/services/supabase/auth';
+import { requestPhoneOtp, verifyPhoneOtp } from '@/services/supabase/auth';
 import { formatPhoneDisplay } from '@/utils/phone';
 import { AuthBackButton } from './AuthBackButton';
 import { AuthBrand } from './AuthBrand';
@@ -21,6 +21,7 @@ export function VerifyOtpScreen({ navigation, route }: Props) {
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
 
   useEffect(() => {
@@ -45,14 +46,10 @@ export function VerifyOtpScreen({ navigation, route }: Props) {
     setLoading(true);
 
     try {
-      const { error: authError } = await bypassPhoneAuth(route.params.phone);
+      const { error: authError } = await verifyPhoneOtp(route.params.phone, code);
 
       if (authError) {
-        setError(
-          authError.message.includes('Email not confirmed')
-            ? 'Phone sign-in is in demo mode. Disable email confirmation in Supabase or use email login.'
-            : authError.message,
-        );
+        setError(authError.message);
       }
     } catch (verifyError) {
       setError(
@@ -63,14 +60,29 @@ export function VerifyOtpScreen({ navigation, route }: Props) {
     }
   };
 
-  const onResend = () => {
-    if (secondsLeft > 0) {
+  const onResend = async () => {
+    if (secondsLeft > 0 || resendLoading) {
       return;
     }
 
     setError(null);
-    setCode('');
-    setSecondsLeft(RESEND_SECONDS);
+    setResendLoading(true);
+
+    try {
+      const { error: resendError } = await requestPhoneOtp(route.params.phone);
+
+      if (resendError) {
+        setError(resendError.message);
+        return;
+      }
+
+      setCode('');
+      setSecondsLeft(RESEND_SECONDS);
+    } catch (resendErr) {
+      setError(resendErr instanceof Error ? resendErr.message : 'Unable to resend code.');
+    } finally {
+      setResendLoading(false);
+    }
   };
 
   const formattedPhone = formatPhoneDisplay(route.params.phone);
@@ -99,8 +111,8 @@ export function VerifyOtpScreen({ navigation, route }: Props) {
           {secondsLeft > 0 ? (
             <Text style={styles.resendTimer}>Resend code in {secondsLeft}s</Text>
           ) : (
-            <Pressable onPress={onResend}>
-              <Text style={styles.resendLink}>Resend code</Text>
+            <Pressable disabled={resendLoading} onPress={() => void onResend()}>
+              <Text style={styles.resendLink}>{resendLoading ? 'Sending…' : 'Resend code'}</Text>
             </Pressable>
           )}
         </View>

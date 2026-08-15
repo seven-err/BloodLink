@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Phone } from 'lucide-react-native';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
@@ -15,11 +16,12 @@ import { z } from 'zod';
 
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { FormTextInput } from '@/components/forms/FormTextInput';
+import { colors } from '@/constants/theme';
+import { useGoogleSignIn } from '@/hooks/useGoogleSignIn';
 import type { AuthStackParamList } from '@/navigation/types';
-import { signInWithEmail, signInWithGoogle } from '@/services/supabase/auth';
+import { signInWithEmail } from '@/services/supabase/auth';
 import { getLoginErrorMessage } from '@/utils/loginErrors';
 import { loginPasswordSchema } from '@/utils/password';
-import { Phone } from 'lucide-react-native';
 import { AuthBrand } from './AuthBrand';
 import { AuthDivider } from './AuthDivider';
 import { AuthIcon, MutedIcon, SocialIcon } from './icons';
@@ -27,7 +29,6 @@ import { AuthTabs } from './AuthTabs';
 import { SecurityFooter } from './SecurityFooter';
 import { SocialButton } from './SocialButton';
 import { authStyles } from './styles';
-import { colors } from '@/constants/theme';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -41,8 +42,13 @@ type FormValues = z.infer<typeof schema>;
 export function LoginScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const {
+    error: googleError,
+    loading: googleLoading,
+    setError: setGoogleError,
+    signIn: signInWithGooglePress,
+  } = useGoogleSignIn({ disabled: loading });
   const {
     control,
     handleSubmit,
@@ -55,8 +61,11 @@ export function LoginScreen({ navigation }: Props) {
     resolver: zodResolver(schema),
   });
 
+  const displayError = error ?? googleError;
+
   const onSubmit = async ({ email, password }: FormValues) => {
     setError(null);
+    setGoogleError(null);
     setLoading(true);
 
     try {
@@ -69,33 +78,6 @@ export function LoginScreen({ navigation }: Props) {
       setError(loginError instanceof Error ? loginError.message : 'Unable to log in.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const onGooglePress = async () => {
-    if (googleLoading || loading) {
-      return;
-    }
-
-    setError(null);
-    setGoogleLoading(true);
-
-    try {
-      const result = await signInWithGoogle();
-
-      if (result.cancelled) {
-        return;
-      }
-
-      if (result.error) {
-        setError(getLoginErrorMessage(result.error.message));
-      }
-    } catch (googleError) {
-      setError(
-        googleError instanceof Error ? googleError.message : 'Unable to sign in with Google.',
-      );
-    } finally {
-      setGoogleLoading(false);
     }
   };
 
@@ -121,14 +103,17 @@ export function LoginScreen({ navigation }: Props) {
         />
         <View style={styles.socials}>
           <SocialButton
+            disabled={googleLoading || loading}
             icon={<Phone color={colors.foreground} size={20} />}
             title="Continue with Phone number"
             onPress={() => navigation.navigate('EnterPhone', { mode: 'login' })}
           />
           <SocialButton
+            disabled={googleLoading || loading}
             icon={<SocialIcon name="google" />}
-            title={googleLoading ? 'Connecting to Google…' : 'Continue with Google'}
-            onPress={() => void onGooglePress()}
+            loading={googleLoading}
+            title="Continue with Google"
+            onPress={() => void signInWithGooglePress()}
           />
         </View>
         <AuthDivider />
@@ -163,7 +148,7 @@ export function LoginScreen({ navigation }: Props) {
                 onChangeText={onChange}
                 onRightIconPress={() => setPasswordVisible((visible) => !visible)}
                 placeholder="Password"
-                rightIcon={<MutedIcon name={passwordVisible ? 'eye-off' : 'eye'} />}
+                rightIcon={<MutedIcon name={passwordVisible ? 'eye' : 'eye-off'} />}
                 secureTextEntry={!passwordVisible}
                 value={value}
               />
@@ -180,8 +165,13 @@ export function LoginScreen({ navigation }: Props) {
           >
             <Text style={styles.forgot}>Forgot Password?</Text>
           </Pressable>
-          {error ? <Text style={authStyles.error}>{error}</Text> : null}
-          <PrimaryButton loading={loading} title="Login" onPress={handleSubmit(onSubmit)} />
+          {displayError ? <Text style={authStyles.error}>{displayError}</Text> : null}
+          <PrimaryButton
+            disabled={googleLoading}
+            loading={loading}
+            title="Login"
+            onPress={handleSubmit(onSubmit)}
+          />
         </View>
         <SecurityFooter />
       </ScrollView>

@@ -60,7 +60,9 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     flex: 1,
     fontSize: 16,
+    minWidth: 0,
     paddingVertical: 0,
+    width: '100%',
   },
   inputError: {
     borderColor: '#dc2626',
@@ -73,6 +75,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     minHeight: 52,
+    overflow: 'hidden',
     paddingHorizontal: 16,
   },
   label: {

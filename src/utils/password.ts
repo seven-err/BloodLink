@@ -4,7 +4,8 @@ export const PASSWORD_RULES = {
   hints: [
     'At least 8 characters',
     'At least 1 number',
-    'Both upper and lower case letters',
+    'At least 1 lowercase letter',
+    'At least 1 uppercase letter',
   ] as const,
   messages: {
     lowercase: 'Password must include lowercase letters.',
@@ -15,6 +16,40 @@ export const PASSWORD_RULES = {
   },
   minLength: 8,
 } as const;
+
+export type PasswordRequirementId = 'minLength' | 'number' | 'lowercase' | 'uppercase';
+
+export type PasswordRequirementStatus = {
+  id: PasswordRequirementId;
+  label: string;
+  met: boolean;
+};
+
+/** Live checklist status for signup password guidance. */
+export const getPasswordRequirementStatus = (
+  password: string,
+): PasswordRequirementStatus[] => [
+  {
+    id: 'minLength',
+    label: PASSWORD_RULES.hints[0],
+    met: password.length >= PASSWORD_RULES.minLength,
+  },
+  {
+    id: 'number',
+    label: PASSWORD_RULES.hints[1],
+    met: /\d/.test(password),
+  },
+  {
+    id: 'lowercase',
+    label: PASSWORD_RULES.hints[2],
+    met: /[a-z]/.test(password),
+  },
+  {
+    id: 'uppercase',
+    label: PASSWORD_RULES.hints[3],
+    met: /[A-Z]/.test(password),
+  },
+];
 
 /** Strong password rules for new account registration. */
 export const signupPasswordSchema = z

@@ -25,20 +25,88 @@ This guide implements Task 1.2 for a manually created Supabase project.
 In Supabase Dashboard > Authentication > Providers:
 
 1. Enable Email provider.
-2. Enable Phone provider.
+2. Enable Phone provider (no Twilio required when using the Send SMS Hook below).
 3. Enable Google provider (Web client ID + optional iOS/Android client IDs from Google Cloud Console).
-4. Keep Phone OTP on Supabase defaults for v1.
-5. For production, configure a dedicated SMS provider and rate limits before launch.
+4. Configure MensaHero SMS delivery (section 3a) before relying on phone OTP in the app.
 
-### Google OAuth redirect URLs
+### 3a. MensaHero SMS (Send SMS Hook)
 
-Add these redirect URLs under Authentication > URL Configuration:
+BloodLink sends phone OTPs through a Supabase Edge Function (`send-sms`) that calls [MensaHero](https://openmensahero.web.app).
 
-- `bloodlink://auth/callback` (native Expo scheme)
-- Your Expo web origin (for example `http://localhost:8081`)
-- Any Expo Go proxy redirect shown by `makeRedirectUri` during development
+**Dashboard quirk:** Phone provider save can require Twilio fields even when using the SMS Hook ([supabase#45198](https://github.com/supabase/supabase/issues/45198)). Use this order:
 
-The mobile app opens Google via `expo-web-browser` + `supabase.auth.signInWithOAuth`, then completes the session with hash tokens or PKCE `exchangeCodeForSession`.
+1. Keep **Send SMS Hook disabled** for a moment.
+2. Authentication → Providers → Phone:
+   - Enable Phone
+   - SMS provider: Twilio
+   - Enter dummy-but-valid placeholders (not real Twilio — unused at runtime):
+     - Account SID: `ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+     - Auth Token: any non-empty string
+     - Message Service SID: `MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+   - Save
+3. Authentication → Hooks → **Send SMS**:
+   - Enable HTTPS hook
+   - URL: `https://qyfmmjxxttncmyetxczf.supabase.co/functions/v1/send-sms`
+   - Generate / copy secret (`v1,whsec_...`)
+4. Set Edge Function secrets (API key + device name should already be set):
+
+```bash
+npx supabase secrets set --project-ref qyfmmjxxttncmyetxczf \
+  SEND_SMS_HOOK_SECRET=v1,whsec_xxx
+```
+
+5. Keep the MensaHero Android gateway online with device name matching `MENSAHERO_DEVICE_NAME` (currently `sev`).
+
+Never put `MENSAHERO_API_KEY` or `SEND_SMS_HOOK_SECRET` in `EXPO_PUBLIC_*` env vars.
+
+With the hook enabled, Auth ignores Twilio and calls MensaHero via `send-sms`.
+
+### Google Sign-In (native in-app picker)
+
+Mobile uses the Google Sign-In SDK (account chooser over the app). Web still uses browser OAuth.
+
+1. In [Google Cloud Console](https://console.cloud.google.com/auth/clients), create:
+   - **Web application** OAuth client (required — used as `webClientId` / ID token audience)
+   - **Android** OAuth client — package `com.sevenerr.BloodLink` + your debug/release SHA-1
+   - **iOS** OAuth client — bundle ID `com.sevenerr.BloodLink` (optional until you build iOS)
+2. Authorized redirect URI on the **Web** client (for Supabase / web login):
+   `https://<project-ref>.supabase.co/auth/v1/callback`
+3. Supabase Dashboard > Authentication > Providers > Google:
+   - Enable Google
+   - Paste Web client ID + secret
+   - Add Android / iOS client IDs (comma-separated) if prompted
+   - Enable **Skip nonce check** for native iOS ID-token sign-in
+4. App env (`.env` / `.env.local`):
+   - `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` = Web client ID
+   - `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` = iOS client ID (iOS builds)
+   - `EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME` = reversed iOS client ID, e.g. `com.googleusercontent.apps.1234-abcd`
+5. Rebuild the native app after adding the plugin (this is **not** supported in Expo Go):
+
+```bash
+# Cloud (recommended if Android SDK is not installed locally)
+npm run build:dev:android
+
+# Or local
+npx expo prebuild --clean
+npx expo run:android
+```
+
+Install the new APK/dev client, then start Metro with `npx expo start` and open the **BloodLink** development build (not Expo Go).
+
+For Android Google Sign-In, the OAuth Android client must use package `com.sevenerr.BloodLink` and the **SHA-1 of the keystore that signed the installed APK** (EAS credentials keystore for EAS builds, or your local debug keystore for `expo run:android`). Get the fingerprint with:
+
+```bash
+eas credentials -p android
+```
+
+Web redirect allow list (Authentication > URL Configuration):
+
+- **Site URL:** `http://localhost:8081` (not `:3000` — wrong Site URL causes “cannot reach localhost”)
+- `http://localhost:8081/**`
+- `bloodlink://**`
+- `exp://**`
+
+Email confirmation uses a native deep link (`bloodlink://` / `exp://`) on device, or `http://localhost:8081/?email_confirmed=1` on Expo web. After confirm, the app shows **You're all set**. Resend the confirmation email after changing Redirect URLs — old links keep the previous address.
 
 The app client stores sessions with `expo-secure-store` through `src/services/supabase/client.ts`.
 

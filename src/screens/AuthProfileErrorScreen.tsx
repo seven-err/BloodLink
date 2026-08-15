@@ -1,12 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '@/components/common/PrimaryButton';
+import { SignOutConfirmModal } from '@/components/common/SignOutConfirmModal';
 import { colors, radii, shadows } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import { signOut } from '@/services/supabase/auth';
+import { useSignOut } from '@/hooks/useSignOut';
 
 export function AuthProfileErrorScreen() {
   const { authError, authRetrying, retryAuth, session } = useAuth();
+  const { cancelSignOut, confirmSignOut, confirmVisible, performSignOut, signingOut } =
+    useSignOut();
 
   return (
     <View style={styles.screen}>
@@ -21,9 +24,23 @@ export function AuthProfileErrorScreen() {
       <View style={styles.actions}>
         <PrimaryButton loading={authRetrying} title="Try again" onPress={retryAuth} />
         {session ? (
-          <PrimaryButton title="Sign out" variant="secondary" onPress={signOut} />
+          <PrimaryButton
+            loading={signingOut}
+            title="Sign out"
+            variant="secondary"
+            onPress={confirmSignOut}
+          />
         ) : null}
       </View>
+
+      <SignOutConfirmModal
+        loading={signingOut}
+        visible={confirmVisible}
+        onCancel={cancelSignOut}
+        onConfirm={() => {
+          void performSignOut();
+        }}
+      />
     </View>
   );
 }

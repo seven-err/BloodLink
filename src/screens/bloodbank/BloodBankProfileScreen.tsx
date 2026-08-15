@@ -2,16 +2,19 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '@/components/common/PrimaryButton';
+import { SignOutConfirmModal } from '@/components/common/SignOutConfirmModal';
 import { colors, radii } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { useSignOut } from '@/hooks/useSignOut';
 import type { BloodBankStackParamList } from '@/navigation/BloodBankNavigator';
-import { signOut } from '@/services/supabase/auth';
 import { formatRoleLabel } from '@/utils/profileDisplay';
 
 type Props = NativeStackScreenProps<BloodBankStackParamList, 'BloodBankProfile'>;
 
 export function BloodBankProfileScreen({ navigation }: Props) {
   const { bloodbankVerification, profile } = useAuth();
+  const { cancelSignOut, confirmSignOut, confirmVisible, performSignOut, signingOut } =
+    useSignOut();
 
   return (
     <ScrollView contentContainerStyle={styles.content} style={styles.screen}>
@@ -51,7 +54,20 @@ export function BloodBankProfileScreen({ navigation }: Props) {
         variant="secondary"
         onPress={() => navigation.navigate('BloodBankSupport')}
       />
-      <PrimaryButton title="Sign out" variant="secondary" onPress={signOut} />
+      <PrimaryButton
+        loading={signingOut}
+        title="Sign out"
+        variant="secondary"
+        onPress={confirmSignOut}
+      />
+      <SignOutConfirmModal
+        loading={signingOut}
+        visible={confirmVisible}
+        onCancel={cancelSignOut}
+        onConfirm={() => {
+          void performSignOut();
+        }}
+      />
     </ScrollView>
   );
 }

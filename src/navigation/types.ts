@@ -7,6 +7,10 @@ import type { BloodType } from '@/types/database';
 export type AuthStackParamList = {
   Welcome: undefined;
   Signup: undefined;
+  VerifyEmail: {
+    email: string;
+    resent?: boolean;
+  };
   EnterPhone: {
     mode: 'signup' | 'login';
   };

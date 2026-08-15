@@ -27,6 +27,12 @@ export const mapStyles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
+  mapContainerFullBleed: {
+    borderColor: 'transparent',
+    borderRadius: 0,
+    borderWidth: 0,
+    minHeight: 0,
+  },
   styleToggle: {
     position: 'absolute',
     right: 10,

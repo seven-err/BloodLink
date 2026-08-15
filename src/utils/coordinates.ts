@@ -99,6 +99,15 @@ type RegionInput = {
   longitude: number;
 };
 
+/** Default map center — Ormoc / Leyte area (OpenStreetMap #map=18/11.052719/124.006913). */
+export const DEFAULT_MAP_COORDINATES = {
+  latitude: 11.052719,
+  longitude: 124.006913,
+} as const;
+
+/** ~zoom 18 street-level viewport for the default center. */
+export const DEFAULT_MAP_DELTA = 0.0035;
+
 export const regionFromCoordinates = (
   coordinates: RegionInput[],
   paddingFactor = 1.4,
@@ -110,10 +119,10 @@ export const regionFromCoordinates = (
 } => {
   if (coordinates.length === 0) {
     return {
-      latitude: 14.5995,
-      longitude: 120.9842,
-      latitudeDelta: 0.35,
-      longitudeDelta: 0.35,
+      latitude: DEFAULT_MAP_COORDINATES.latitude,
+      longitude: DEFAULT_MAP_COORDINATES.longitude,
+      latitudeDelta: DEFAULT_MAP_DELTA,
+      longitudeDelta: DEFAULT_MAP_DELTA,
     };
   }
 

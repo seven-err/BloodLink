@@ -1,4 +1,6 @@
-const DONATION_INTERVAL_DAYS = 56;
+import { DONATION_INTERVAL_DAYS } from '@/utils/donorEligibility';
+
+export { DONATION_INTERVAL_DAYS };
 
 export const getDaysUntilNextEligible = (lastDonationAt: string | null | undefined): number | null => {
   if (!lastDonationAt) {

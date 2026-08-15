@@ -6,16 +6,14 @@ import { colors, radii } from '@/constants/theme';
 type HemieMessageBubbleProps = {
   isUser?: boolean;
   text: string;
-  timestamp: string;
 };
 
-export function HemieMessageBubble({ isUser = false, text, timestamp }: HemieMessageBubbleProps) {
+export function HemieMessageBubble({ isUser = false, text }: HemieMessageBubbleProps) {
   if (isUser) {
     return (
       <View style={styles.userRow}>
         <View style={styles.userBubble}>
           <Text style={styles.userText}>{text}</Text>
-          <Text style={styles.userTimestamp}>{timestamp}</Text>
         </View>
       </View>
     );
@@ -26,7 +24,6 @@ export function HemieMessageBubble({ isUser = false, text, timestamp }: HemieMes
       <HemieAvatar size={36} />
       <View style={styles.assistantBubble}>
         <Text style={styles.assistantText}>{text}</Text>
-        <Text style={styles.assistantTimestamp}>{timestamp}</Text>
       </View>
     </View>
   );
@@ -39,7 +36,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.card,
     borderWidth: 1,
     flex: 1,
-    gap: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
@@ -53,14 +49,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
-  assistantTimestamp: {
-    color: colors.mutedLight,
-    fontSize: 12,
-  },
   userBubble: {
     backgroundColor: colors.primary,
     borderRadius: radii.card,
-    gap: 6,
     maxWidth: '82%',
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -72,10 +63,5 @@ const styles = StyleSheet.create({
     color: colors.primaryForeground,
     fontSize: 15,
     lineHeight: 22,
-  },
-  userTimestamp: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    textAlign: 'right',
   },
 });

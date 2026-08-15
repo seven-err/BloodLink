@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 import { useCallback, useState } from 'react';
 
+import { getHighAccuracyPosition } from '@/services/location/getHighAccuracyPosition';
 import type { Coordinates } from '@/services/location/types';
 
 export type ForegroundLocationStatus =
@@ -13,6 +14,7 @@ export type ForegroundLocationStatus =
 
 export type ForegroundLocationState = {
   coordinates: Coordinates | null;
+  accuracyMeters: number | null;
   status: ForegroundLocationStatus;
   message: string | null;
   canAskAgain: boolean;
@@ -20,6 +22,7 @@ export type ForegroundLocationState = {
 
 const initialState: ForegroundLocationState = {
   coordinates: null,
+  accuracyMeters: null,
   status: 'idle',
   message: null,
   canAskAgain: true,
@@ -46,6 +49,7 @@ export const useForegroundLocation = () => {
 
         setState({
           coordinates: null,
+          accuracyMeters: null,
           status: 'denied',
           message,
           canAskAgain: permission.canAskAgain,
@@ -58,6 +62,7 @@ export const useForegroundLocation = () => {
       if (!servicesEnabled) {
         setState({
           coordinates: null,
+          accuracyMeters: null,
           status: 'services_disabled',
           message: 'Location services are off. Enable them to see distances from your position.',
           canAskAgain: permission.canAskAgain,
@@ -65,9 +70,7 @@ export const useForegroundLocation = () => {
         return null;
       }
 
-      const currentPosition = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      const currentPosition = await getHighAccuracyPosition();
 
       const coordinates = {
         latitude: currentPosition.coords.latitude,
@@ -76,6 +79,7 @@ export const useForegroundLocation = () => {
 
       setState({
         coordinates,
+        accuracyMeters: currentPosition.coords.accuracy ?? null,
         status: 'granted',
         message: null,
         canAskAgain: permission.canAskAgain,
@@ -85,8 +89,9 @@ export const useForegroundLocation = () => {
     } catch {
       setState({
         coordinates: null,
+        accuracyMeters: null,
         status: 'error',
-        message: 'Unable to read your location. You can still browse requests on the map.',
+        message: 'Unable to read an accurate GPS fix. Move outdoors with a clear sky view, then try again.',
         canAskAgain: true,
       });
       return null;

@@ -1,19 +1,32 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Crosshair, RefreshCw, Search, Users } from 'lucide-react-native';
+import {
+  CheckCircle2,
+  Crosshair,
+  Droplets,
+  Map as MapIcon,
+  MapPin,
+  Minus,
+  Plus,
+  RefreshCw,
+  Satellite,
+  Search,
+  SlidersHorizontal,
+  UserRound,
+  Users,
+  X,
+} from 'lucide-react-native';
 import {
   ActivityIndicator,
   Modal,
   Pressable,
-  RefreshControl,
   ScrollView,
   Switch,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,7 +34,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NearbyDonorCard } from '@/components/donor/NearbyDonorCard';
 import { Skeleton } from '@/components/common/Skeleton';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
-import { OpenStreetMapView } from '@/components/map/OpenStreetMapView';
+import {
+  OpenStreetMapView,
+  type OpenStreetMapViewHandle,
+} from '@/components/map/OpenStreetMapView';
+import type { MapViewMode } from '@/constants/mapTiles';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useUserMode, type UserMode } from '@/context/UserModeContext';
@@ -35,7 +52,8 @@ import {
 } from '@/services/supabase/nearbyMapDonors';
 import { setDonorMapVisibility } from '@/services/supabase/profiles';
 import type { BloodType } from '@/types/database';
-import { approximateCoordinates, regionFromCoordinates } from '@/utils/coordinates';
+import { getValidCoordinates, regionFromCoordinates } from '@/utils/coordinates';
+import { formatDistance } from '@/utils/travelMetrics';
 import { sanitizeProfileError } from '@/utils/profileErrors';
 
 type Props = CompositeScreenProps<
@@ -47,70 +65,65 @@ const BLOOD_TYPES: BloodType[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O
 const RADIUS_OPTIONS = [5, 10, 25] as const;
 
 type RadiusOption = (typeof RADIUS_OPTIONS)[number];
+type CategoryChip = 'all' | 'available' | RadiusOption;
 
 type MapScreenCopy = {
   emptyNoLocation: string;
   emptyNoResults: (radiusKm: number) => string;
   filterModalTitle: string;
-  headerSubtitle: string;
-  headerTitle: string;
+  listTitle: string;
+  loadingLabel: string;
   searchPlaceholder: string;
-  sectionTitle: string;
+  summaryTitle: (count: number) => string;
   visibilityHelper: string;
 };
 
 const MAP_SCREEN_COPY: Record<UserMode, MapScreenCopy> = {
   donate: {
-    headerTitle: 'Nearby Area',
-    headerSubtitle: 'Browse donors on the map while you are available to help.',
-    searchPlaceholder: 'Search nearby...',
-    sectionTitle: 'Donors in Area',
+    searchPlaceholder: 'Search donors & area...',
+    listTitle: 'Donors in Area',
     filterModalTitle: 'Filter nearby donors',
+    loadingLabel: 'Loading nearby donors...',
+    summaryTitle: (count) =>
+      count === 1 ? '1 donor nearby' : `${count} donors nearby`,
     emptyNoLocation:
-      'Turn on location to explore donors near you and see approximate distances.',
+      'Turn on location to explore donors near you and see distances from your GPS position.',
     emptyNoResults: (radiusKm) =>
       `No donors match your filters within ${radiusKm} km. Try widening the radius or adjusting filters.`,
     visibilityHelper:
-      'Opt in to appear as an approximate pin for others browsing nearby.',
+      'Opt in to appear as a precise GPS pin for others browsing nearby.',
   },
   request: {
-    headerTitle: 'Nearby Donors',
-    headerSubtitle: 'Find compatible donors near you for your blood request.',
-    searchPlaceholder: 'Search donors...',
-    sectionTitle: 'Available Donors',
+    searchPlaceholder: 'Search donors nearby...',
+    listTitle: 'Available Donors',
     filterModalTitle: 'Filter donors',
+    loadingLabel: 'Loading nearby donors...',
+    summaryTitle: (count) =>
+      count === 1 ? '1 donor nearby' : `${count} donors nearby`,
     emptyNoLocation:
       'Turn on location to load nearby donors and distances from your position.',
     emptyNoResults: (radiusKm) =>
       `No donors match your filters within ${radiusKm} km. Try widening the radius or turning off the Available filter.`,
     visibilityHelper:
-      'Verified donors can opt in to appear as an approximate pin nearby.',
+      'Verified donors can opt in to appear as a precise GPS pin nearby.',
   },
 };
 
 /** ~1° latitude ≈ 111 km — used so radius chips change map zoom. */
 const KM_PER_DEGREE = 111;
 
-const getMapHeight = (windowHeight: number) =>
-  Math.round(Math.min(520, Math.max(380, windowHeight * 0.46)));
-
-function NearbyDonorsMapSkeleton({
-  mapHeight,
-  topInset,
-}: {
-  mapHeight: number;
-  topInset: number;
-}) {
+function NearbyDonorsMapSkeleton({ topInset }: { topInset: number }) {
   return (
     <View style={nearbyDonorsMapStyles.screen}>
-      <View style={[nearbyDonorsMapStyles.header, { paddingTop: topInset + 8 }]}>
-        <Skeleton borderRadius={10} height={28} width="50%" />
-        <Skeleton borderRadius={14} height={46} width="100%" />
-        <Skeleton borderRadius={999} height={36} width="100%" />
+      <View style={[nearbyDonorsMapStyles.topOverlay, { paddingTop: topInset + 8 }]}>
+        <Skeleton borderRadius={24} height={50} style={{ marginHorizontal: 16 }} width="auto" />
+        <Skeleton borderRadius={999} height={38} style={{ marginHorizontal: 16 }} width="70%" />
       </View>
-      <Skeleton borderRadius={0} height={mapHeight} width="100%" />
-      <View style={nearbyDonorsMapStyles.listContent}>
-        <Skeleton borderRadius={16} height={160} width="100%" />
+      <View style={nearbyDonorsMapStyles.mapFill}>
+        <Skeleton borderRadius={0} height="100%" width="100%" />
+      </View>
+      <View style={[nearbyDonorsMapStyles.bottomOverlay, { bottom: 24 }]}>
+        <Skeleton borderRadius={24} height={120} width="100%" />
       </View>
     </View>
   );
@@ -141,9 +154,7 @@ const getOriginCoordinates = (
 };
 
 export function NearbyDonorsMapScreen({ navigation }: Props) {
-  const { top: topInset } = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
-  const mapHeight = getMapHeight(windowHeight);
+  const { top: topInset, bottom: bottomInset } = useSafeAreaInsets();
   const { profile, refreshProfile, session } = useAuth();
   const { mode } = useUserMode();
   const copy = MAP_SCREEN_COPY[mode];
@@ -157,9 +168,12 @@ export function NearbyDonorsMapScreen({ navigation }: Props) {
   const [radiusKm, setRadiusKm] = useState<RadiusOption>(10);
   const [selectedDonorId, setSelectedDonorId] = useState<string | null>(null);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [listModalVisible, setListModalVisible] = useState(false);
   const [mapVisibilityLoading, setMapVisibilityLoading] = useState(false);
   const [mapVisibilityError, setMapVisibilityError] = useState<string | null>(null);
   const [regionNonce, setRegionNonce] = useState(0);
+  const [mapMode, setMapMode] = useState<MapViewMode>('standard');
+  const mapRef = useRef<OpenStreetMapViewHandle>(null);
 
   const {
     coordinates: gpsCoordinates,
@@ -253,9 +267,10 @@ export function NearbyDonorsMapScreen({ navigation }: Props) {
   }, [donors, searchQuery]);
 
   const mapRegion = useMemo(() => {
-    const points = visibleDonors.map((donor) =>
-      approximateCoordinates(donor.latitude, donor.longitude),
-    );
+    const points = visibleDonors.flatMap((donor) => {
+      const coordinates = getValidCoordinates(donor.latitude, donor.longitude);
+      return coordinates ? [coordinates] : [];
+    });
 
     if (originCoordinates) {
       points.push(originCoordinates);
@@ -264,7 +279,6 @@ export function NearbyDonorsMapScreen({ navigation }: Props) {
     const fitted = regionFromCoordinates(points);
     const radiusDelta = Math.max((radiusKm / KM_PER_DEGREE) * 2.2, 0.04);
 
-    // Keep zoom practical for the selected search radius even with few pins.
     return {
       ...fitted,
       latitude: originCoordinates?.latitude ?? fitted.latitude,
@@ -276,14 +290,29 @@ export function NearbyDonorsMapScreen({ navigation }: Props) {
 
   const mapMarkers = useMemo(
     () =>
-      visibleDonors.map((donor) => ({
-        id: donor.donorId,
-        coordinates: approximateCoordinates(donor.latitude, donor.longitude),
-        title: donor.fullName,
-        description: `${donor.bloodType} · ${donor.isAvailable ? 'Available' : 'Unavailable'}`,
-        pinColor: donor.isAvailable ? colors.success : colors.primary,
-      })),
-    [visibleDonors],
+      visibleDonors.flatMap((donor) => {
+        const coordinates = getValidCoordinates(donor.latitude, donor.longitude);
+
+        if (!coordinates) {
+          return [];
+        }
+
+        return [
+          {
+            id: donor.donorId,
+            coordinates,
+            title: donor.fullName,
+            description: `${donor.bloodType} · ${donor.isAvailable ? 'Available' : 'Unavailable'}`,
+            pinColor:
+              selectedDonorId === donor.donorId
+                ? colors.primaryDark
+                : donor.isAvailable
+                  ? colors.success
+                  : colors.primary,
+          },
+        ];
+      }),
+    [selectedDonorId, visibleDonors],
   );
 
   const availableCount = useMemo(
@@ -291,8 +320,29 @@ export function NearbyDonorsMapScreen({ navigation }: Props) {
     [visibleDonors],
   );
 
+  const selectedDonor = useMemo(
+    () => visibleDonors.find((donor) => donor.donorId === selectedDonorId) ?? null,
+    [selectedDonorId, visibleDonors],
+  );
+
   const openDonorDetail = (donor: NearbyMapDonorItem) => {
+    setListModalVisible(false);
     navigation.getParent()?.navigate('NearbyDonorDetail', { donor });
+  };
+
+  const handleCategoryPress = (chip: CategoryChip) => {
+    if (chip === 'all') {
+      setBloodTypeFilter(null);
+      setAvailableOnly(false);
+      return;
+    }
+
+    if (chip === 'available') {
+      setAvailableOnly((current) => !current);
+      return;
+    }
+
+    setRadiusKm(chip);
   };
 
   const handleMapVisibilityToggle = async (visibleOnMap: boolean) => {
@@ -319,7 +369,7 @@ export function NearbyDonorsMapScreen({ navigation }: Props) {
         !Number.isFinite(longitude)
       ) {
         setMapVisibilityError(
-          'Turn on location first so BloodLink can place your approximate pin on the map.',
+          'Turn on location first so BloodLink can place your GPS pin on the map.',
         );
         setMapVisibilityLoading(false);
         return;
@@ -350,31 +400,96 @@ export function NearbyDonorsMapScreen({ navigation }: Props) {
   const isDonor = profile?.role === 'donor';
   const showMapVisibilityCard = isDonor && mode === 'donate';
   const isMapBusy = loading || refreshing;
+  const locationBlocked =
+    locationStatus === 'denied' ||
+    locationStatus === 'services_disabled' ||
+    locationStatus === 'error';
   const showInitialSkeleton = loading && !originCoordinates && locationStatus === 'requesting';
+  const hasActiveFilters = bloodTypeFilter != null || availableOnly || radiusKm !== 10;
 
   if (showInitialSkeleton) {
-    return <NearbyDonorsMapSkeleton mapHeight={mapHeight} topInset={topInset} />;
+    return <NearbyDonorsMapSkeleton topInset={topInset} />;
   }
+
+  const renderCategoryChip = (
+    chip: CategoryChip,
+    label: string,
+    icon: ReactNode,
+    isActive: boolean,
+  ) => (
+    <Pressable
+      key={String(chip)}
+      style={[nearbyDonorsMapStyles.chip, isActive ? nearbyDonorsMapStyles.chipActive : null]}
+      onPress={() => handleCategoryPress(chip)}
+    >
+      {icon}
+      <Text
+        style={[
+          nearbyDonorsMapStyles.chipLabel,
+          isActive ? nearbyDonorsMapStyles.chipLabelActive : null,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
 
   return (
     <View style={nearbyDonorsMapStyles.screen}>
-      <View style={[nearbyDonorsMapStyles.header, { paddingTop: topInset + 8 }]}>
-        <View style={nearbyDonorsMapStyles.headerTitleBlock}>
-          <Text style={nearbyDonorsMapStyles.headerTitle}>{copy.headerTitle}</Text>
-          <Text style={nearbyDonorsMapStyles.headerSubtitle}>{copy.headerSubtitle}</Text>
-        </View>
-
-        <View style={nearbyDonorsMapStyles.searchRow}>
-          <View style={nearbyDonorsMapStyles.searchShell}>
-            <Search color={colors.muted} size={18} strokeWidth={2} />
-            <TextInput
-              placeholder={copy.searchPlaceholder}
-              placeholderTextColor={colors.mutedLight}
-              style={nearbyDonorsMapStyles.searchInput}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
+      <View pointerEvents="box-none" style={nearbyDonorsMapStyles.mapFill}>
+        {originCoordinates ? (
+          <OpenStreetMapView
+            ref={mapRef}
+            fillContainer
+            focusToken={regionNonce}
+            fullBleed
+            mapMode={mapMode}
+            markers={mapMarkers}
+            region={mapRegion}
+            selectedMarkerId={selectedDonorId}
+            showAttribution={false}
+            showStyleToggle={false}
+            showsUserLocation={locationStatus === 'granted'}
+            userCoordinates={gpsCoordinates}
+            onMapModeChange={setMapMode}
+            onMapPress={() => setSelectedDonorId(null)}
+            onMarkerPress={setSelectedDonorId}
+          />
+        ) : (
+          <View style={nearbyDonorsMapStyles.emptyOverlay}>
+            <View style={nearbyDonorsMapStyles.emptyCard}>
+              <Text style={nearbyDonorsMapStyles.emptyText}>{copy.emptyNoLocation}</Text>
+              <PrimaryButton title="Enable location" onPress={() => void requestLocation()} />
+            </View>
           </View>
+        )}
+      </View>
+
+      <View
+        pointerEvents="box-none"
+        style={[nearbyDonorsMapStyles.topOverlay, { paddingTop: topInset + 8 }]}
+      >
+        <View style={nearbyDonorsMapStyles.searchShell}>
+          <Search color={colors.muted} size={18} strokeWidth={2} />
+          <TextInput
+            placeholder={copy.searchPlaceholder}
+            placeholderTextColor={colors.mutedLight}
+            style={nearbyDonorsMapStyles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          <Pressable
+            accessibilityLabel="Open map filters"
+            accessibilityRole="button"
+            style={nearbyDonorsMapStyles.filterButton}
+            onPress={() => setFilterModalVisible(true)}
+          >
+            <SlidersHorizontal
+              color={hasActiveFilters ? colors.primary : colors.muted}
+              size={18}
+              strokeWidth={2.25}
+            />
+          </Pressable>
         </View>
 
         <ScrollView
@@ -383,240 +498,300 @@ export function NearbyDonorsMapScreen({ navigation }: Props) {
           showsHorizontalScrollIndicator={false}
           style={nearbyDonorsMapStyles.chipScroll}
         >
-          <Pressable
-            style={[
-              nearbyDonorsMapStyles.chip,
-              bloodTypeFilter === null ? nearbyDonorsMapStyles.chipActive : null,
-            ]}
-            onPress={() => setBloodTypeFilter(null)}
-          >
-            <Text
-              style={[
-                nearbyDonorsMapStyles.chipLabel,
-                bloodTypeFilter === null ? nearbyDonorsMapStyles.chipLabelActive : null,
-              ]}
-            >
-              All Types
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[
-              nearbyDonorsMapStyles.chip,
-              availableOnly ? nearbyDonorsMapStyles.chipActive : null,
-            ]}
-            onPress={() => setAvailableOnly((current) => !current)}
-          >
-            <Text
-              style={[
-                nearbyDonorsMapStyles.chipLabel,
-                availableOnly ? nearbyDonorsMapStyles.chipLabelActive : null,
-              ]}
-            >
-              Available
-            </Text>
-          </Pressable>
-
-          {RADIUS_OPTIONS.map((option) => (
-            <Pressable
-              key={option}
-              style={[
-                nearbyDonorsMapStyles.chip,
-                radiusKm === option ? nearbyDonorsMapStyles.chipActive : null,
-              ]}
-              onPress={() => setRadiusKm(option)}
-            >
-              <Text
-                style={[
-                  nearbyDonorsMapStyles.chipLabel,
-                  radiusKm === option ? nearbyDonorsMapStyles.chipLabelActive : null,
-                ]}
-              >
-                {option} km
-              </Text>
-            </Pressable>
-          ))}
+          {renderCategoryChip(
+            'all',
+            'All',
+            <MapPin
+              color={
+                bloodTypeFilter === null && !availableOnly
+                  ? colors.primaryForeground
+                  : colors.muted
+              }
+              size={15}
+              strokeWidth={2.25}
+            />,
+            bloodTypeFilter === null && !availableOnly,
+          )}
+          {renderCategoryChip(
+            'available',
+            'Available',
+            <CheckCircle2
+              color={availableOnly ? colors.primaryForeground : colors.muted}
+              size={15}
+              strokeWidth={2.25}
+            />,
+            availableOnly,
+          )}
+          {RADIUS_OPTIONS.map((option) =>
+            renderCategoryChip(
+              option,
+              `${option} km`,
+              <Droplets
+                color={radiusKm === option ? colors.primaryForeground : colors.muted}
+                size={15}
+                strokeWidth={2.25}
+              />,
+              radiusKm === option,
+            ),
+          )}
         </ScrollView>
+
+        {loading && !refreshing && originCoordinates ? (
+          <View style={nearbyDonorsMapStyles.mapLoadingBadge}>
+            <ActivityIndicator color={colors.primary} size="small" />
+            <Text style={nearbyDonorsMapStyles.mapLoadingText}>{copy.loadingLabel}</Text>
+          </View>
+        ) : null}
       </View>
 
-      {locationStatus === 'denied' ||
-      locationStatus === 'services_disabled' ||
-      locationStatus === 'error' ? (
-        <View style={nearbyDonorsMapStyles.permissionBanner}>
-          <Text style={nearbyDonorsMapStyles.permissionText}>{locationMessage}</Text>
-          <PrimaryButton
-            title="Enable location"
-            variant="secondary"
-            onPress={() => void requestLocation()}
-          />
-        </View>
-      ) : null}
-
-      {showMapVisibilityCard ? (
-        <View style={nearbyDonorsMapStyles.visibilityCard}>
-          <View style={nearbyDonorsMapStyles.visibilityRow}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={nearbyDonorsMapStyles.visibilityTitle}>Show me on the map</Text>
-              <Text style={nearbyDonorsMapStyles.visibilityCopy}>{copy.visibilityHelper}</Text>
-            </View>
-            <Switch
-              disabled={mapVisibilityLoading}
-              thumbColor={colors.card}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              value={profile?.visible_on_map ?? false}
-              onValueChange={(value) => void handleMapVisibilityToggle(value)}
-            />
-          </View>
-          {mapVisibilityError ? (
-            <Text style={nearbyDonorsMapStyles.errorText}>{mapVisibilityError}</Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      <View style={[nearbyDonorsMapStyles.mapSection, { height: mapHeight }]}>
-        <View style={[nearbyDonorsMapStyles.mapWrapper, { height: mapHeight }]}>
-          {originCoordinates ? (
-            <OpenStreetMapView
-              focusToken={regionNonce}
-              height={mapHeight}
-              markers={mapMarkers}
-              region={mapRegion}
-              selectedMarkerId={selectedDonorId}
-              showsUserLocation={locationStatus === 'granted'}
-              onMarkerPress={setSelectedDonorId}
-            />
-          ) : (
-            <View
-              style={[
-                nearbyDonorsMapStyles.emptyCard,
-                {
-                  flex: 1,
-                  justifyContent: 'center',
-                  margin: 24,
-                },
+      {originCoordinates ? (
+        <>
+          <View
+            pointerEvents="box-none"
+            style={[
+              nearbyDonorsMapStyles.zoomControls,
+              { bottom: (selectedDonor ? 210 : 150) + Math.max(bottomInset, 8) },
+            ]}
+          >
+            <Pressable
+              accessibilityLabel="Zoom in"
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                nearbyDonorsMapStyles.mapControlButton,
+                pressed ? nearbyDonorsMapStyles.mapControlButtonPressed : null,
               ]}
+              onPress={() => mapRef.current?.zoomIn()}
             >
-              <Text style={nearbyDonorsMapStyles.emptyText}>{copy.emptyNoLocation}</Text>
-              <PrimaryButton title="Enable location" onPress={() => void requestLocation()} />
+              <Plus color={colors.foreground} size={20} strokeWidth={2.25} />
+            </Pressable>
+            <Pressable
+              accessibilityLabel="Zoom out"
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                nearbyDonorsMapStyles.mapControlButton,
+                pressed ? nearbyDonorsMapStyles.mapControlButtonPressed : null,
+              ]}
+              onPress={() => mapRef.current?.zoomOut()}
+            >
+              <Minus color={colors.foreground} size={20} strokeWidth={2.25} />
+            </Pressable>
+          </View>
+
+          <View
+            pointerEvents="box-none"
+            style={[
+              nearbyDonorsMapStyles.mapControls,
+              { bottom: (selectedDonor ? 210 : 150) + Math.max(bottomInset, 8) },
+            ]}
+          >
+            <Pressable
+              accessibilityLabel="Refresh map and donor list"
+              accessibilityRole="button"
+              disabled={isMapBusy}
+              style={({ pressed }) => [
+                nearbyDonorsMapStyles.mapControlButton,
+                pressed || isMapBusy ? nearbyDonorsMapStyles.mapControlButtonPressed : null,
+              ]}
+              onPress={() => void handleRefresh()}
+            >
+              {refreshing ? (
+                <ActivityIndicator color={colors.primary} size="small" />
+              ) : (
+                <RefreshCw color={colors.foreground} size={20} strokeWidth={2.25} />
+              )}
+            </Pressable>
+
+            <Pressable
+              accessibilityLabel="Recenter map on my location"
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                nearbyDonorsMapStyles.mapControlButton,
+                pressed ? nearbyDonorsMapStyles.mapControlButtonPressed : null,
+              ]}
+              onPress={() => void handleRecenter()}
+            >
+              <Crosshair color={colors.foreground} size={20} strokeWidth={2.25} />
+            </Pressable>
+
+            <Pressable
+              accessibilityLabel={
+                mapMode === 'satellite' ? 'Switch to street map' : 'Switch to satellite map'
+              }
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                nearbyDonorsMapStyles.mapControlButton,
+                pressed ? nearbyDonorsMapStyles.mapControlButtonPressed : null,
+              ]}
+              onPress={() =>
+                setMapMode((current) => (current === 'satellite' ? 'standard' : 'satellite'))
+              }
+            >
+              {mapMode === 'satellite' ? (
+                <MapIcon color={colors.foreground} size={20} strokeWidth={2.25} />
+              ) : (
+                <Satellite color={colors.foreground} size={20} strokeWidth={2.25} />
+              )}
+            </Pressable>
+          </View>
+        </>
+      ) : null}
+
+      <View
+        pointerEvents="box-none"
+        style={[
+          nearbyDonorsMapStyles.bottomOverlay,
+          { bottom: 12 + Math.max(bottomInset, 4) },
+        ]}
+      >
+          {locationBlocked ? (
+            <View style={nearbyDonorsMapStyles.permissionBanner}>
+              <Text style={nearbyDonorsMapStyles.permissionText}>{locationMessage}</Text>
+              <PrimaryButton
+                title="Enable location"
+                variant="secondary"
+                onPress={() => void requestLocation()}
+              />
             </View>
-          )}
+          ) : null}
 
-          {originCoordinates ? (
-            <>
-              <View style={nearbyDonorsMapStyles.mapControls}>
+          {error ? (
+            <View style={nearbyDonorsMapStyles.permissionBanner}>
+              <Text style={nearbyDonorsMapStyles.errorText}>{error}</Text>
+              <PrimaryButton title="Try again" onPress={() => void handleRefresh()} />
+            </View>
+          ) : null}
+
+          {selectedDonor ? (
+            <View style={nearbyDonorsMapStyles.detailCard}>
+              <Pressable
+                accessibilityLabel="Dismiss selected donor"
+                accessibilityRole="button"
+                style={nearbyDonorsMapStyles.detailClose}
+                onPress={() => setSelectedDonorId(null)}
+              >
+                <X color={colors.muted} size={18} strokeWidth={2.25} />
+              </Pressable>
+
+              <Text style={nearbyDonorsMapStyles.detailEyebrow}>
+                {selectedDonor.isAvailable ? 'Available donor' : 'Nearby donor'}
+              </Text>
+              <Text numberOfLines={2} style={nearbyDonorsMapStyles.detailTitle}>
+                {selectedDonor.fullName}
+              </Text>
+              <Text style={nearbyDonorsMapStyles.detailMeta}>
+                {selectedDonor.bloodType} · {formatDistance(selectedDonor.distanceMeters)}
+                {selectedDonor.isVerified ? ' · Verified' : ''}
+              </Text>
+
+              <View style={nearbyDonorsMapStyles.detailActions}>
                 <Pressable
-                  accessibilityLabel="Refresh map and donor list"
                   accessibilityRole="button"
-                  disabled={isMapBusy}
-                  style={({ pressed }) => [
-                    nearbyDonorsMapStyles.mapControlButton,
-                    pressed || isMapBusy ? nearbyDonorsMapStyles.mapControlButtonPressed : null,
-                  ]}
-                  onPress={() => void handleRefresh()}
+                  style={nearbyDonorsMapStyles.detailPrimaryButton}
+                  onPress={() => openDonorDetail(selectedDonor)}
                 >
-                  {refreshing ? (
-                    <ActivityIndicator color={colors.primary} size="small" />
-                  ) : (
-                    <RefreshCw color={colors.foreground} size={20} strokeWidth={2.25} />
-                  )}
+                  <UserRound color={colors.primaryForeground} size={18} strokeWidth={2.25} />
+                  <Text style={nearbyDonorsMapStyles.detailPrimaryLabel}>View profile</Text>
                 </Pressable>
-
                 <Pressable
-                  accessibilityLabel="Recenter map on my location"
                   accessibilityRole="button"
-                  style={({ pressed }) => [
-                    nearbyDonorsMapStyles.mapControlButton,
-                    pressed ? nearbyDonorsMapStyles.mapControlButtonPressed : null,
-                  ]}
-                  onPress={() => void handleRecenter()}
+                  style={nearbyDonorsMapStyles.detailSecondaryButton}
+                  onPress={() => setListModalVisible(true)}
                 >
-                  <Crosshair color={colors.foreground} size={20} strokeWidth={2.25} />
+                  <Text style={nearbyDonorsMapStyles.detailSecondaryLabel}>Browse list</Text>
                 </Pressable>
               </View>
-
-              {loading && !refreshing ? (
-                <View style={nearbyDonorsMapStyles.mapLoadingBadge}>
-                  <ActivityIndicator color={colors.primary} size="small" />
-                  <Text style={nearbyDonorsMapStyles.mapLoadingText}>Updating…</Text>
-                </View>
-              ) : null}
-
-              <View style={nearbyDonorsMapStyles.mapSummaryCard}>
-                <View style={nearbyDonorsMapStyles.mapSummaryRow}>
-                  <Users color={colors.primary} size={18} strokeWidth={2} />
-                  <Text style={nearbyDonorsMapStyles.mapSummaryLabel}>
-                    {visibleDonors.length} donor{visibleDonors.length === 1 ? '' : 's'} · {radiusKm}{' '}
-                    km
+            </View>
+          ) : originCoordinates ? (
+            <Pressable
+              accessibilityRole="button"
+              style={nearbyDonorsMapStyles.summaryCard}
+              onPress={() => setListModalVisible(true)}
+            >
+              <View style={nearbyDonorsMapStyles.summaryRow}>
+                <Users color={colors.primary} size={22} strokeWidth={2.25} />
+                <View style={nearbyDonorsMapStyles.summaryTextBlock}>
+                  <Text style={nearbyDonorsMapStyles.summaryTitle}>
+                    {copy.summaryTitle(visibleDonors.length)}
+                  </Text>
+                  <Text style={nearbyDonorsMapStyles.summaryMeta}>
+                    Within {radiusKm} km
+                    {bloodTypeFilter ? ` · ${bloodTypeFilter}` : ''}
                   </Text>
                 </View>
                 <Text
                   style={
                     availableCount > 0
-                      ? nearbyDonorsMapStyles.mapSummaryStat
-                      : nearbyDonorsMapStyles.mapSummaryStatMuted
+                      ? nearbyDonorsMapStyles.summaryStat
+                      : nearbyDonorsMapStyles.summaryStatMuted
                   }
                 >
                   {availableCount} available
                 </Text>
               </View>
-            </>
+              {visibleDonors.length === 0 && !loading ? (
+                <Text style={nearbyDonorsMapStyles.summaryMeta}>
+                  {copy.emptyNoResults(radiusKm)}
+                </Text>
+              ) : (
+                <Text style={nearbyDonorsMapStyles.filterLink}>Tap to browse donors</Text>
+              )}
+            </Pressable>
           ) : null}
         </View>
-      </View>
 
-      <ScrollView
-        contentContainerStyle={nearbyDonorsMapStyles.listContent}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            colors={[colors.primary]}
-            refreshing={refreshing}
-            tintColor={colors.primary}
-            onRefresh={() => void handleRefresh()}
-          />
-        }
-        style={nearbyDonorsMapStyles.listScroll}
+      <Modal
+        animationType="slide"
+        transparent
+        visible={listModalVisible}
+        onRequestClose={() => setListModalVisible(false)}
       >
-        <View>
-          <View style={nearbyDonorsMapStyles.donorSectionHeader}>
-            <Text style={nearbyDonorsMapStyles.donorSectionTitle}>{copy.sectionTitle}</Text>
-            <Pressable accessibilityRole="button" onPress={() => setFilterModalVisible(true)}>
-              <Text style={nearbyDonorsMapStyles.filterLink}>Filter</Text>
-            </Pressable>
-          </View>
+        <Pressable
+          style={nearbyDonorsMapStyles.listModalScrim}
+          onPress={() => setListModalVisible(false)}
+        >
+          <Pressable
+            style={nearbyDonorsMapStyles.listModalBody}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <View style={nearbyDonorsMapStyles.listModalHandle} />
+            <View style={nearbyDonorsMapStyles.donorSectionHeader}>
+              <Text style={nearbyDonorsMapStyles.donorSectionTitle}>{copy.listTitle}</Text>
+              <Pressable accessibilityRole="button" onPress={() => setFilterModalVisible(true)}>
+                <Text style={nearbyDonorsMapStyles.filterLink}>Filter</Text>
+              </Pressable>
+            </View>
 
-          {error ? <Text style={nearbyDonorsMapStyles.errorText}>{error}</Text> : null}
-
-          {!originCoordinates ? (
-            <View style={nearbyDonorsMapStyles.emptyCard}>
-              <Text style={nearbyDonorsMapStyles.emptyText}>{copy.emptyNoLocation}</Text>
-            </View>
-          ) : loading && donors.length === 0 ? (
-            <Skeleton borderRadius={16} height={160} width="100%" />
-          ) : visibleDonors.length === 0 ? (
-            <View style={nearbyDonorsMapStyles.emptyCard}>
-              <Text style={nearbyDonorsMapStyles.emptyText}>
-                {copy.emptyNoResults(radiusKm)}
-              </Text>
-              <PrimaryButton title="Refresh map" onPress={() => void handleRefresh()} />
-            </View>
-          ) : (
-            <View style={nearbyDonorsMapStyles.donorList}>
-              {visibleDonors.map((donor) => (
-                <NearbyDonorCard
-                  key={donor.donorId}
-                  donor={donor}
-                  selected={selectedDonorId === donor.donorId}
-                  onPress={() => {
-                    setSelectedDonorId(donor.donorId);
-                    openDonorDetail(donor);
-                  }}
-                />
-              ))}
-            </View>
-          )}
-        </View>
-      </ScrollView>
+            {loading && donors.length === 0 ? (
+              <Skeleton borderRadius={16} height={160} width="100%" />
+            ) : visibleDonors.length === 0 ? (
+              <View style={nearbyDonorsMapStyles.emptyCard}>
+                <Text style={nearbyDonorsMapStyles.emptyText}>
+                  {copy.emptyNoResults(radiusKm)}
+                </Text>
+                <PrimaryButton title="Refresh map" onPress={() => void handleRefresh()} />
+              </View>
+            ) : (
+              <ScrollView
+                contentContainerStyle={nearbyDonorsMapStyles.donorList}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {visibleDonors.map((donor) => (
+                  <NearbyDonorCard
+                    key={donor.donorId}
+                    donor={donor}
+                    selected={selectedDonorId === donor.donorId}
+                    onPress={() => {
+                      setSelectedDonorId(donor.donorId);
+                      openDonorDetail(donor);
+                    }}
+                  />
+                ))}
+              </ScrollView>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         animationType="slide"
@@ -625,24 +800,16 @@ export function NearbyDonorsMapScreen({ navigation }: Props) {
         onRequestClose={() => setFilterModalVisible(false)}
       >
         <Pressable
-          style={{
-            backgroundColor: 'rgba(0,0,0,0.35)',
-            flex: 1,
-            justifyContent: 'flex-end',
-          }}
+          style={nearbyDonorsMapStyles.listModalScrim}
           onPress={() => setFilterModalVisible(false)}
         >
           <Pressable
-            style={{
-              backgroundColor: colors.card,
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              gap: 16,
-              padding: 24,
-            }}
+            style={nearbyDonorsMapStyles.listModalBody}
             onPress={(event) => event.stopPropagation()}
           >
+            <View style={nearbyDonorsMapStyles.listModalHandle} />
             <Text style={nearbyDonorsMapStyles.donorSectionTitle}>{copy.filterModalTitle}</Text>
+
             <Text style={nearbyDonorsMapStyles.visibilityCopy}>Blood type</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               <Pressable
@@ -716,6 +883,29 @@ export function NearbyDonorsMapScreen({ navigation }: Props) {
                 </Pressable>
               ))}
             </View>
+
+            {showMapVisibilityCard ? (
+              <View style={{ gap: 8 }}>
+                <View style={nearbyDonorsMapStyles.visibilityRow}>
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text style={nearbyDonorsMapStyles.visibilityTitle}>Show me on the map</Text>
+                    <Text style={nearbyDonorsMapStyles.visibilityCopy}>
+                      {copy.visibilityHelper}
+                    </Text>
+                  </View>
+                  <Switch
+                    disabled={mapVisibilityLoading}
+                    thumbColor={colors.card}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                    value={profile?.visible_on_map ?? false}
+                    onValueChange={(value) => void handleMapVisibilityToggle(value)}
+                  />
+                </View>
+                {mapVisibilityError ? (
+                  <Text style={nearbyDonorsMapStyles.errorText}>{mapVisibilityError}</Text>
+                ) : null}
+              </View>
+            ) : null}
 
             <PrimaryButton
               title="Apply filters"

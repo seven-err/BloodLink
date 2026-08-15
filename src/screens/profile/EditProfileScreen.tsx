@@ -24,6 +24,7 @@ import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import type { AppStackParamList } from '@/navigation/types';
+import { getHighAccuracyPosition } from '@/services/location/getHighAccuracyPosition';
 import { updateProfile } from '@/services/supabase/profiles';
 import {
   donorEditProfileSchema,
@@ -183,9 +184,7 @@ export function EditProfileScreen({ navigation }: Props) {
         return;
       }
 
-      const currentPosition = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      const currentPosition = await getHighAccuracyPosition();
 
       const nextCoordinates = {
         latitude: currentPosition.coords.latitude,

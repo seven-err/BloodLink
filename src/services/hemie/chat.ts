@@ -13,6 +13,8 @@ export type HemieChatContext = {
   birthdate?: string | null;
   weightKg?: number | null;
   lastTransfusionDate?: string | null;
+  lastDonationAt?: string | null;
+  isAvailable?: boolean | null;
 };
 
 export type HemieChatResult = {

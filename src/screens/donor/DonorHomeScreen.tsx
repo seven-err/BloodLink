@@ -14,6 +14,7 @@ import { ModeToggle } from '@/components/common/ModeToggle';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { Skeleton } from '@/components/common/Skeleton';
 import { HemieFloatingButton } from '@/components/hemie/HemieFloatingButton';
+import { NearbyDonorFeedCard } from '@/components/recipient/NearbyDonorFeedCard';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import type { AppTabParamList } from '@/navigation/AppTabNavigator';
@@ -29,11 +30,16 @@ import {
   isDonorVerificationActive,
   setDonorAvailability,
 } from '@/services/supabase/profiles';
+import {
+  getNearbyMapDonors,
+  type NearbyMapDonorItem,
+} from '@/services/supabase/nearbyMapDonors';
 import { canDonorEnableAvailability } from '@/utils/donorAvailability';
 import { getBloodTypeCompatibilityLabel } from '@/utils/bloodTypeCompatibility';
 import { haversineDistanceMeters } from '@/utils/coordinates';
 import { countDonationsThisYear, getDaysUntilNextEligible } from '@/utils/donorDonationStats';
 import { formatRelativeTime } from '@/utils/relativeTime';
+import { formatLastDonationLabel } from '@/utils/donorMapDisplay';
 import { sanitizeProfileError } from '@/utils/profileErrors';
 
 type Props = CompositeScreenProps<
@@ -46,6 +52,14 @@ const URGENCY_PRIORITY = {
   urgent: 1,
   normal: 2,
 } as const;
+
+const formatDistanceLabel = (distanceMeters: number) => {
+  if (distanceMeters < 1000) {
+    return `${Math.round(distanceMeters)} m`;
+  }
+
+  return `${(distanceMeters / 1000).toFixed(1)} km`;
+};
 
 const getFirstName = (fullName: string | null | undefined) => {
   const trimmed = fullName?.trim();
@@ -99,6 +113,7 @@ export function DonorHomeScreen({ navigation }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [availabilityOverride, setAvailabilityOverride] = useState<boolean | null>(null);
+  const [nearbyDonors, setNearbyDonors] = useState<NearbyMapDonorItem[]>([]);
 
   const firstName = getFirstName(profile?.full_name);
   const canEnableAvailability = canDonorEnableAvailability(profile, verificationActive);
@@ -197,6 +212,18 @@ export function DonorHomeScreen({ navigation }: Props) {
       setRequests(requestsResult.data ?? []);
       setVerificationActive(Boolean(verificationResult.data));
 
+      if (profile?.latitude != null && profile?.longitude != null) {
+        const donorsResult = await getNearbyMapDonors({
+          originLatitude: profile.latitude,
+          originLongitude: profile.longitude,
+          radiusKm: 5,
+          maxResults: 3,
+        });
+        if (!donorsResult.error) {
+          setNearbyDonors(donorsResult.data ?? []);
+        }
+      }
+
       const completedDonations = (donationsResult.data ?? []).filter(
         (item) => item.donationStatus === 'completed' || item.matchStatus === 'completed',
       );
@@ -219,7 +246,7 @@ export function DonorHomeScreen({ navigation }: Props) {
       setRefreshing(false);
       hasLoadedOnceRef.current = true;
     }
-  }, [session?.user.id]);
+  }, [session?.user.id, profile?.latitude, profile?.longitude]);
 
   useFocusEffect(
     useCallback(() => {
@@ -415,6 +442,41 @@ export function DonorHomeScreen({ navigation }: Props) {
                     .getParent()
                     ?.navigate('DonorRequestDetail', { requestId: request.id })
                 }
+              />
+            ))
+          )}
+        </View>
+
+        <View style={donorHomeStyles.sectionHeader}>
+          <Text style={donorHomeStyles.sectionTitle}>Available Donors Nearby</Text>
+          <Pressable
+            accessibilityLabel="View all donors on map"
+            accessibilityRole="button"
+            style={donorHomeStyles.viewAllButton}
+            onPress={() => navigation.navigate('Map')}
+          >
+            <Text style={donorHomeStyles.linkText}>View Map</Text>
+          </Pressable>
+        </View>
+
+        <View style={donorHomeStyles.urgentList}>
+          {nearbyDonors.length === 0 ? (
+            <View style={donorHomeStyles.bloodTypeCard}>
+              <Text style={donorHomeStyles.bloodTypeMeta}>
+                No donors found nearby right now. Pull down to refresh or check the map.
+              </Text>
+            </View>
+          ) : (
+            nearbyDonors.map((donor) => (
+              <NearbyDonorFeedCard
+                key={donor.donorId}
+                bloodType={donor.bloodType}
+                distanceLabel={formatDistanceLabel(donor.distanceMeters)}
+                isAvailable={donor.isAvailable}
+                name={donor.fullName}
+                timeLabel={formatLastDonationLabel(donor.lastDonationAt).replace('Last donation: ', '')}
+                onDetails={() => navigation.getParent()?.navigate('NearbyDonorDetail', { donor })}
+                onRequest={() => navigation.getParent()?.navigate('NearbyDonorDetail', { donor })}
               />
             ))
           )}

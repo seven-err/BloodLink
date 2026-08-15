@@ -36,7 +36,7 @@ BloodLink is a mobile blood-donation coordination system built with Expo and Rea
    EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
    EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    EXPO_PUBLIC_API_URL=http://localhost:3001
-   EXPO_PUBLIC_AUTH_REDIRECT_URL=bloodlink://
+   EXPO_PUBLIC_AUTH_REDIRECT_URL=http://localhost:8081
    EXPO_PUBLIC_NOMINATIM_URL=https://nominatim.openstreetmap.org
    EXPO_PUBLIC_OSRM_URL=https://router.project-osrm.org
    EXPO_PUBLIC_OSM_USER_AGENT=BloodLink/1.0
@@ -93,3 +93,5 @@ docs/                 Setup and workflow guides
 ## Git workflow
 
 See [Git workflow](docs/git-workflow.md) for the project's branch and commit conventions.
+
+update: npm run update:production -- --message "fix home layout"

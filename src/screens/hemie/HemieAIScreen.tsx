@@ -34,16 +34,12 @@ type ChatMessage = {
   id: string;
   isUser: boolean;
   text: string;
-  timestamp: string;
 };
 
 const DISCLAIMER_STORAGE_KEY = 'hemie_emergency_disclaimer_hidden';
 const COMPOSER_SPACE = 88;
 const KEYBOARD_COMPOSER_LIFT = 20;
 const WELCOME_TEXT = getHemieWelcomeMessage();
-
-const formatChatTimestamp = () =>
-  new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 let messageCounter = 0;
 const createMessageId = () => `hemie-${Date.now()}-${messageCounter++}`;
@@ -70,7 +66,6 @@ export function HemieAIScreen({ navigation }: Props) {
       id: createMessageId(),
       isUser: false,
       text: WELCOME_TEXT,
-      timestamp: formatChatTimestamp(),
     },
   ]);
 
@@ -99,11 +94,20 @@ export function HemieAIScreen({ navigation }: Props) {
     () => ({
       birthdate: profile?.birthdate,
       bloodType: profile?.blood_type,
+      isAvailable: profile?.is_available,
+      lastDonationAt: profile?.last_donation_at ?? null,
       lastTransfusionDate: null as string | null,
       role: profile?.role,
       weightKg: profile?.weight_kg,
     }),
-    [profile?.birthdate, profile?.blood_type, profile?.role, profile?.weight_kg],
+    [
+      profile?.birthdate,
+      profile?.blood_type,
+      profile?.is_available,
+      profile?.last_donation_at,
+      profile?.role,
+      profile?.weight_kg,
+    ],
   );
 
   const scrollToBottom = useCallback(() => {
@@ -129,7 +133,6 @@ export function HemieAIScreen({ navigation }: Props) {
         id: createMessageId(),
         isUser: true,
         text: trimmed,
-        timestamp: formatChatTimestamp(),
       };
 
       setDraft('');
@@ -141,17 +144,22 @@ export function HemieAIScreen({ navigation }: Props) {
       });
       scrollToBottom();
 
-      let replyText = getHemieResponse(trimmed, hemieContext);
+      let replyText =
+        'Hemie could not reach the assistant service. Check your connection and try again.';
 
       try {
         const accessToken = session?.access_token;
-        if (accessToken) {
+        if (!accessToken) {
+          replyText = getHemieResponse(trimmed, hemieContext);
+        } else {
           const history = toApiMessages(messagesRef.current);
           const result = await askHemie({
             accessToken,
             context: {
               birthdate: hemieContext.birthdate,
               bloodType: hemieContext.bloodType,
+              isAvailable: hemieContext.isAvailable,
+              lastDonationAt: hemieContext.lastDonationAt,
               lastTransfusionDate: hemieContext.lastTransfusionDate,
               role: hemieContext.role,
               weightKg: hemieContext.weightKg,
@@ -160,7 +168,8 @@ export function HemieAIScreen({ navigation }: Props) {
           });
           replyText = result.reply;
         }
-      } catch {
+      } catch (error) {
+        console.warn('Hemie chat request failed:', error);
         replyText = getHemieResponse(trimmed, hemieContext);
       }
 
@@ -168,7 +177,6 @@ export function HemieAIScreen({ navigation }: Props) {
         id: createMessageId(),
         isUser: false,
         text: replyText,
-        timestamp: formatChatTimestamp(),
       };
 
       setMessages((current) => [...current, assistantMessage]);
@@ -257,7 +265,6 @@ export function HemieAIScreen({ navigation }: Props) {
             key={message.id}
             isUser={message.isUser}
             text={message.text}
-            timestamp={message.timestamp}
           />
         ))}
 
