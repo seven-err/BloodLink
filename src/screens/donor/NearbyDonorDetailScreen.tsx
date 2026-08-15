@@ -158,7 +158,7 @@ export function NearbyDonorDetailScreen({ navigation, route }: Props) {
           <View style={nearbyDonorDetailStyles.statRow}>
             <MapPin color={colors.primary} size={20} strokeWidth={2} />
             <View style={nearbyDonorDetailStyles.statCopy}>
-              <Text style={nearbyDonorDetailStyles.statLabel}>Approximate distance</Text>
+              <Text style={nearbyDonorDetailStyles.statLabel}>Distance</Text>
               <Text style={nearbyDonorDetailStyles.statValue}>
                 {formatDistance(donor.distanceMeters)}
               </Text>

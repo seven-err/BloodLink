@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DonorVerificationBadge } from '@/components/donor/DonorVerificationBadge';
 import { ModeToggle } from '@/components/common/ModeToggle';
+import { SignOutConfirmModal } from '@/components/common/SignOutConfirmModal';
 import { Skeleton } from '@/components/common/Skeleton';
 import { ProfileAvatar } from '@/components/profile/ProfileAvatar';
 import { colors } from '@/constants/theme';
@@ -206,7 +207,15 @@ export function UserProfileScreen({ navigation }: Props) {
   const { top: topInset } = useSafeAreaInsets();
   const { profile, refreshProfile, session } = useAuth();
   const { mode } = useUserMode();
-  const { clearSignOutError, confirmSignOut, signOutError, signingOut } = useSignOut();
+  const {
+    cancelSignOut,
+    clearSignOutError,
+    confirmSignOut,
+    confirmVisible,
+    performSignOut,
+    signOutError,
+    signingOut,
+  } = useSignOut();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -381,7 +390,7 @@ export function UserProfileScreen({ navigation }: Props) {
           </>
         ) : (
           <>
-            <View style={styles.overviewCard}>
+            <View style={styles.profileCard}>
               <View style={styles.overviewHeader}>
                 <View style={styles.avatarWrap}>
                   <ProfileAvatar
@@ -414,41 +423,6 @@ export function UserProfileScreen({ navigation }: Props) {
                 </View>
               </View>
 
-              <View style={styles.divider} />
-              <View style={styles.modeSection}>
-                <Text style={styles.modeStatusLabel}>
-                  {getModeDisplayLabel(mode)} mode
-                </Text>
-                <Text style={styles.modeSubtitle}>
-                  {getModeSubtitle(mode, profile.role)}
-                </Text>
-                <View style={styles.modeToggleWrap}>
-                  <ModeToggle />
-                </View>
-              </View>
-
-              {isDonor ? (
-                <>
-                  <View style={styles.divider} />
-                  <View style={styles.statRow}>
-                    <View style={styles.statColumn}>
-                      <Text style={styles.statValue}>{totalDonations}</Text>
-                      <Text style={styles.statLabel}>Donations</Text>
-                    </View>
-                    <View style={styles.statColumn}>
-                      <Text style={styles.statValue}>{eligibilityStat.value}</Text>
-                      <Text style={styles.statLabel}>{eligibilityStat.label}</Text>
-                    </View>
-                    <View style={styles.statColumn}>
-                      <Text style={styles.statValue}>
-                        {responseRate == null ? '—' : `${responseRate}%`}
-                      </Text>
-                      <Text style={styles.statLabel}>Response</Text>
-                    </View>
-                  </View>
-                </>
-              ) : null}
-
               <Pressable
                 accessibilityRole="button"
                 style={({ pressed }) => [
@@ -461,6 +435,47 @@ export function UserProfileScreen({ navigation }: Props) {
                 <Text style={styles.editProfileText}>Edit Profile</Text>
               </Pressable>
             </View>
+
+            <View style={styles.modeCard}>
+              <View style={styles.modeSection}>
+                <Text style={styles.modeStatusLabel}>
+                  {getModeDisplayLabel(mode)} mode
+                </Text>
+                <Text style={styles.modeSubtitle}>
+                  {getModeSubtitle(mode, profile.role)}
+                </Text>
+                <View style={styles.modeToggleWrap}>
+                  <ModeToggle />
+                </View>
+              </View>
+            </View>
+
+            {isDonor ? (
+              <View style={styles.statsCard}>
+                <View style={styles.statRow}>
+                  <View style={styles.statColumn}>
+                    <Text style={styles.statValuePrimary}>{totalDonations}</Text>
+                    <Text style={styles.statLabel}>Donations</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statColumn}>
+                    <Text style={
+                      eligibilityStat.value === 'Now' ? styles.statValueSuccess : styles.statValueWarning
+                    }>{eligibilityStat.value}</Text>
+                    <Text style={styles.statLabel}>{eligibilityStat.label}</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statColumn}>
+                    <Text style={
+                      responseRate != null && responseRate >= 80 ? styles.statValueSuccess : styles.statValuePrimary
+                    }>
+                      {responseRate == null ? '\u2014' : `${responseRate}%`}
+                    </Text>
+                    <Text style={styles.statLabel}>Response</Text>
+                  </View>
+                </View>
+              </View>
+            ) : null}
 
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Contact Information</Text>
@@ -557,6 +572,15 @@ export function UserProfileScreen({ navigation }: Props) {
           </>
         )}
       </ScrollView>
+
+      <SignOutConfirmModal
+        loading={signingOut}
+        visible={confirmVisible}
+        onCancel={cancelSignOut}
+        onConfirm={() => {
+          void performSignOut();
+        }}
+      />
     </View>
   );
 }

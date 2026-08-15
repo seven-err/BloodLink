@@ -2,15 +2,18 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '@/components/common/PrimaryButton';
+import { SignOutConfirmModal } from '@/components/common/SignOutConfirmModal';
 import { colors, radii } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { useSignOut } from '@/hooks/useSignOut';
 import type { BloodBankStackParamList } from '@/navigation/BloodBankNavigator';
-import { signOut } from '@/services/supabase/auth';
 
 type Props = NativeStackScreenProps<BloodBankStackParamList, 'BloodBankVerificationStatus'>;
 
 export function BloodBankVerificationStatusScreen({ navigation }: Props) {
   const { bloodbankVerification } = useAuth();
+  const { cancelSignOut, confirmSignOut, confirmVisible, performSignOut, signingOut } =
+    useSignOut();
   const status = bloodbankVerification?.status ?? 'pending';
 
   const title =
@@ -56,7 +59,20 @@ export function BloodBankVerificationStatusScreen({ navigation }: Props) {
         variant="secondary"
         onPress={() => navigation.navigate('BloodBankSupport')}
       />
-      <PrimaryButton title="Sign out" variant="secondary" onPress={signOut} />
+      <PrimaryButton
+        loading={signingOut}
+        title="Sign out"
+        variant="secondary"
+        onPress={confirmSignOut}
+      />
+      <SignOutConfirmModal
+        loading={signingOut}
+        visible={confirmVisible}
+        onCancel={cancelSignOut}
+        onConfirm={() => {
+          void performSignOut();
+        }}
+      />
     </View>
   );
 }

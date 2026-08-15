@@ -1,23 +1,59 @@
 import { NavigationContainer } from '@react-navigation/native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { EmailConfirmedScreen } from '@/screens/auth/EmailConfirmedScreen';
 import { AuthProfileErrorScreen } from '@/screens/AuthProfileErrorScreen';
 import { RestrictedAccessScreen } from '@/screens/RestrictedAccessScreen';
 import { isAdminRole, isBloodbankRole, isMobileAppRole } from '@/utils/roles';
-import { AppNavigator } from './AppNavigator';
 import { AuthNavigator } from './AuthNavigator';
-import { BloodBankNavigator } from './BloodBankNavigator';
-import { ProfileSetupNavigator } from './ProfileSetupNavigator';
+import { navigationRef } from './navigationRef';
+
+/**
+ * Heavy role navigators (maps, reanimated skeletons, chat) stay behind require()
+ * so the logged-out Welcome path never evaluates MapLibre / app tabs at import time.
+ */
+function loadAppNavigator() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('./AppNavigator').AppNavigator as typeof import('./AppNavigator').AppNavigator;
+}
+
+function loadBloodBankNavigator() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('./BloodBankNavigator')
+    .BloodBankNavigator as typeof import('./BloodBankNavigator').BloodBankNavigator;
+}
+
+function loadProfileSetupNavigator() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('./ProfileSetupNavigator')
+    .ProfileSetupNavigator as typeof import('./ProfileSetupNavigator').ProfileSetupNavigator;
+}
+
+function BootSplash() {
+  return (
+    <View style={styles.boot}>
+      <ActivityIndicator color={colors.primary} size="large" />
+    </View>
+  );
+}
 
 export function RootNavigator() {
   const {
     authError,
     bloodbankVerification,
+    emailJustConfirmed,
+    initializing,
     profile,
     profileComplete,
     profileLoading,
     session,
   } = useAuth();
+
+  if (initializing) {
+    return <BootSplash />;
+  }
 
   const profilePending = Boolean(session && profileLoading && !profile);
   const showDonorRecipientApp = Boolean(
@@ -33,13 +69,29 @@ export function RootNavigator() {
     return <AuthProfileErrorScreen />;
   }
 
-  return (
-    <NavigationContainer>
-      {!session ? (
+  if (session && emailJustConfirmed) {
+    return <EmailConfirmedScreen />;
+  }
+
+  if (!session) {
+    return (
+      <NavigationContainer>
         <AuthNavigator />
-      ) : showRestrictedAccess ? (
-        <RestrictedAccessScreen />
-      ) : showBloodBankApp ? (
+      </NavigationContainer>
+    );
+  }
+
+  if (showRestrictedAccess) {
+    return <RestrictedAccessScreen />;
+  }
+
+  const BloodBankNavigator = loadBloodBankNavigator();
+  const ProfileSetupNavigator = loadProfileSetupNavigator();
+  const AppNavigator = loadAppNavigator();
+
+  return (
+    <NavigationContainer ref={navigationRef}>
+      {showBloodBankApp ? (
         <BloodBankNavigator verificationStatus={bloodbankVerification?.status ?? 'pending'} />
       ) : showProfileSetup ? (
         <ProfileSetupNavigator />
@@ -51,3 +103,12 @@ export function RootNavigator() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  boot: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    flex: 1,
+    justifyContent: 'center',
+  },
+});

@@ -4,6 +4,7 @@ import type { AuthStackParamList } from '@/navigation/types';
 import { EnterPhoneScreen } from '@/screens/auth/EnterPhoneScreen';
 import { LoginScreen } from '@/screens/auth/LoginScreen';
 import { SignupScreen } from '@/screens/auth/SignupScreen';
+import { VerifyEmailScreen } from '@/screens/auth/VerifyEmailScreen';
 import { VerifyOtpScreen } from '@/screens/auth/VerifyOtpScreen';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
 
@@ -42,6 +43,11 @@ export function AuthNavigator() {
         component={SignupScreen}
         name="Signup"
         options={{ title: 'Sign Up' }}
+      />
+      <Stack.Screen
+        component={VerifyEmailScreen}
+        name="VerifyEmail"
+        options={{ title: 'Verify Email' }}
       />
     </Stack.Navigator>
   );

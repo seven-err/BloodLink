@@ -53,9 +53,15 @@ const metadataPhone = (user: User) => {
 };
 
 const metadataFullName = (user: User) => {
-  const fullName = user.user_metadata?.full_name;
+  const candidates = [user.user_metadata?.full_name, user.user_metadata?.name];
 
-  return typeof fullName === 'string' && fullName.trim() ? fullName.trim() : null;
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return null;
 };
 
 export const syncProfileFromAuthUser = async (user: User) => {

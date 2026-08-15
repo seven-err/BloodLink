@@ -26,6 +26,7 @@ import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import type { AppStackParamList } from '@/navigation/types';
 import { createBloodRequestStyles } from '@/screens/recipient/createBloodRequestStyles';
+import { getHighAccuracyPosition } from '@/services/location/getHighAccuracyPosition';
 import { createBloodRequest } from '@/services/supabase/bloodRequests';
 import {
   uploadBloodRequestAttachment,
@@ -129,9 +130,7 @@ export function CreateBloodRequestScreen({ navigation, route }: Props) {
         return;
       }
 
-      const currentPosition = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      const currentPosition = await getHighAccuracyPosition();
 
       setCoordinates({
         latitude: currentPosition.coords.latitude,

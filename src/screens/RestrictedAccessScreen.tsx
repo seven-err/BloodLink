@@ -1,12 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '@/components/common/PrimaryButton';
+import { SignOutConfirmModal } from '@/components/common/SignOutConfirmModal';
 import { colors, radii, shadows } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import { signOut } from '@/services/supabase/auth';
+import { useSignOut } from '@/hooks/useSignOut';
 
 export function RestrictedAccessScreen() {
   const { profile } = useAuth();
+  const { cancelSignOut, confirmSignOut, confirmVisible, performSignOut, signingOut } =
+    useSignOut();
   const roleLabel = profile?.role === 'admin' ? 'Administrator' : 'staff';
 
   return (
@@ -24,7 +27,20 @@ export function RestrictedAccessScreen() {
         </Text>
       </View>
 
-      <PrimaryButton title="Sign out" variant="secondary" onPress={signOut} />
+      <PrimaryButton
+        loading={signingOut}
+        title="Sign out"
+        variant="secondary"
+        onPress={confirmSignOut}
+      />
+      <SignOutConfirmModal
+        loading={signingOut}
+        visible={confirmVisible}
+        onCancel={cancelSignOut}
+        onConfirm={() => {
+          void performSignOut();
+        }}
+      />
     </View>
   );
 }

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react-native';
 import { Alert, ScrollView, Text, View } from 'react-native';
 
+import { SignOutConfirmModal } from '@/components/common/SignOutConfirmModal';
 import { SettingsRow } from '@/components/settings/SettingsRow';
 import { SettingsScreenHeader } from '@/components/settings/SettingsScreenHeader';
 import { SettingsSection } from '@/components/settings/SettingsSection';
@@ -34,6 +35,7 @@ import {
   updateNotificationPreferences,
   type NotificationPreferences,
 } from '@/services/supabase/notificationPreferences';
+import { getHighAccuracyPosition } from '@/services/location/getHighAccuracyPosition';
 import { setDonorMapVisibility } from '@/services/supabase/profiles';
 import { authStyles } from '@/screens/auth/styles';
 import { sanitizeProfileError } from '@/utils/profileErrors';
@@ -54,7 +56,15 @@ const DEFAULT_NOTIFICATION_PREFS: Pick<
 
 export function SettingsScreen({ navigation }: Props) {
   const { profile, refreshProfile, session } = useAuth();
-  const { clearSignOutError, confirmSignOut, signOutError, signingOut } = useSignOut();
+  const {
+    cancelSignOut,
+    clearSignOutError,
+    confirmSignOut,
+    confirmVisible,
+    performSignOut,
+    signOutError,
+    signingOut,
+  } = useSignOut();
 
   const [mapVisibilityLoading, setMapVisibilityLoading] = useState(false);
   const [mapVisibilityError, setMapVisibilityError] = useState<string | null>(null);
@@ -172,9 +182,7 @@ export function SettingsScreen({ navigation }: Props) {
       }
 
       try {
-        const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        const position = await getHighAccuracyPosition();
         latitude = position.coords.latitude;
         longitude = position.coords.longitude;
       } catch {
@@ -329,7 +337,7 @@ export function SettingsScreen({ navigation }: Props) {
             <SettingsRow
               icon={<MapPin color={colors.primary} size={22} strokeWidth={1.75} />}
               label="Show on Donor Map"
-              subtitle="Let verified users see your approximate pin"
+              subtitle="Let verified users see your GPS pin on the map"
               trailing={
                 <SettingsToggle
                   disabled={mapVisibilityLoading}
@@ -409,6 +417,15 @@ export function SettingsScreen({ navigation }: Props) {
           <Text style={settingsStyles.footerText}>© 2026 BloodLink. All rights reserved.</Text>
         </View>
       </ScrollView>
+
+      <SignOutConfirmModal
+        loading={signingOut}
+        visible={confirmVisible}
+        onCancel={cancelSignOut}
+        onConfirm={() => {
+          void performSignOut();
+        }}
+      />
     </View>
   );
 }

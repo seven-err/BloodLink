@@ -8,9 +8,9 @@ import { z } from 'zod';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { FormTextInput } from '@/components/forms/FormTextInput';
 import { colors } from '@/constants/theme';
+import { useGoogleSignIn } from '@/hooks/useGoogleSignIn';
 import type { AuthStackParamList } from '@/navigation/types';
-import { signInWithGoogle } from '@/services/supabase/auth';
-import { getLoginErrorMessage } from '@/utils/loginErrors';
+import { requestPhoneOtp } from '@/services/supabase/auth';
 import { normalizePhoneNumber } from '@/utils/phone';
 import { AuthBackButton } from './AuthBackButton';
 import { AuthBrand } from './AuthBrand';
@@ -30,8 +30,13 @@ type FormValues = z.infer<typeof schema>;
 
 export function EnterPhoneScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const {
+    error: googleError,
+    loading: googleLoading,
+    setError: setGoogleError,
+    signIn: signInWithGooglePress,
+  } = useGoogleSignIn({ disabled: loading });
   const {
     control,
     handleSubmit,
@@ -43,43 +48,31 @@ export function EnterPhoneScreen({ navigation, route }: Props) {
     resolver: zodResolver(schema),
   });
 
-  const onSubmit = ({ phone }: FormValues) => {
+  const onSubmit = async ({ phone }: FormValues) => {
+    setGoogleError(null);
+    setPhoneError(null);
     setLoading(true);
 
     const normalizedPhone = normalizePhoneNumber(phone);
 
-    navigation.navigate('VerifyOtp', {
-      mode: route.params.mode,
-      phone: normalizedPhone,
-    });
-
-    setLoading(false);
-  };
-
-  const onGooglePress = async () => {
-    if (googleLoading || loading) {
-      return;
-    }
-
-    setError(null);
-    setGoogleLoading(true);
-
     try {
-      const result = await signInWithGoogle();
+      const { error } = await requestPhoneOtp(normalizedPhone);
 
-      if (result.cancelled) {
+      if (error) {
+        setPhoneError(error.message);
         return;
       }
 
-      if (result.error) {
-        setError(getLoginErrorMessage(result.error.message));
-      }
-    } catch (googleError) {
-      setError(
-        googleError instanceof Error ? googleError.message : 'Unable to sign in with Google.',
+      navigation.navigate('VerifyOtp', {
+        mode: route.params.mode,
+        phone: normalizedPhone,
+      });
+    } catch (submitError) {
+      setPhoneError(
+        submitError instanceof Error ? submitError.message : 'Unable to send verification code.',
       );
     } finally {
-      setGoogleLoading(false);
+      setLoading(false);
     }
   };
 
@@ -105,9 +98,11 @@ export function EnterPhoneScreen({ navigation, route }: Props) {
         </View>
         <View style={styles.socials}>
           <SocialButton
+            disabled={googleLoading || loading}
             icon={<SocialIcon name="google" />}
-            title={googleLoading ? 'Connecting to Google…' : 'Continue with Google'}
-            onPress={() => void onGooglePress()}
+            loading={googleLoading}
+            title="Continue with Google"
+            onPress={() => void signInWithGooglePress()}
           />
         </View>
         <AuthDivider />
@@ -129,9 +124,16 @@ export function EnterPhoneScreen({ navigation, route }: Props) {
               />
             )}
           />
-          {error ? <Text style={authStyles.error}>{error}</Text> : null}
-          <PrimaryButton loading={loading} title="Continue" onPress={handleSubmit(onSubmit)} />
+          {phoneError ? <Text style={authStyles.error}>{phoneError}</Text> : null}
+          {googleError ? <Text style={authStyles.error}>{googleError}</Text> : null}
           <PrimaryButton
+            disabled={googleLoading}
+            loading={loading}
+            title="Continue"
+            onPress={handleSubmit((values) => void onSubmit(values))}
+          />
+          <PrimaryButton
+            disabled={googleLoading}
             title={route.params.mode === 'signup' ? 'Sign up with email' : 'Login with email'}
             variant="secondary"
             onPress={() =>

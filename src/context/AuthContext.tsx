@@ -10,13 +10,13 @@ import {
   useRef,
   useState,
 } from 'react';
+import { Platform } from 'react-native';
 
 import { supabase } from '@/services/supabase/client';
 import {
   getBloodbankVerification,
   type BloodbankVerification,
 } from '@/services/supabase/bloodbankVerifications';
-import { parseAuthCodeFromUrl, parseAuthTokensFromUrl } from '@/utils/authRedirect';
 import { prefetchProfileAvatar } from '@/services/supabase/profileAvatar';
 import {
   getProfile,
@@ -25,11 +25,22 @@ import {
   type Profile,
 } from '@/services/supabase/profiles';
 import { sanitizeAuthError } from '@/utils/authErrors';
+import {
+  clearAuthParamsFromBrowserUrl,
+  isEmailConfirmationRedirect,
+  parseAuthCodeFromUrl,
+  parseAuthErrorFromUrl,
+  parseAuthTokensFromUrl,
+  parseTokenHashFromUrl,
+  resetBrowserPathAfterEmailConfirmation,
+} from '@/utils/authRedirect';
 
 type AuthContextValue = {
+  acknowledgeEmailConfirmation: () => void;
   authError: string | null;
   authRetrying: boolean;
   bloodbankVerification: BloodbankVerification | null;
+  emailJustConfirmed: boolean;
   initializing: boolean;
   profileLoading: boolean;
   session: Session | null;
@@ -49,6 +60,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     useState<BloodbankVerification | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authRetrying, setAuthRetrying] = useState(false);
+  const [emailJustConfirmed, setEmailJustConfirmed] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const mountedRef = useRef(false);
   const profileRequestIdRef = useRef(0);
@@ -137,6 +149,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const refreshProfile = useCallback(async () => {
     await loadProfile(session, { background: true });
   }, [loadProfile, session]);
+
+  const acknowledgeEmailConfirmation = useCallback(() => {
+    resetBrowserPathAfterEmailConfirmation();
+    setEmailJustConfirmed(false);
+  }, []);
 
   const retryAuth = useCallback(async () => {
     if (authRetrying) {
@@ -240,29 +257,69 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [initializing, loadProfile, session]);
 
   useEffect(() => {
+    const hasActiveSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      return Boolean(data.session);
+    };
+
     const activateSessionFromUrl = async (url: string | null) => {
       if (!url) {
         return;
       }
 
-      const tokens = parseAuthTokensFromUrl(url);
-
-      if (tokens) {
-        await supabase.auth.setSession({
-          access_token: tokens.accessToken,
-          refresh_token: tokens.refreshToken,
-        });
+      if (parseAuthErrorFromUrl(url)) {
         return;
       }
 
-      const code = parseAuthCodeFromUrl(url);
+      const showEmailConfirmed = isEmailConfirmationRedirect(url);
+      const tokens = parseAuthTokensFromUrl(url);
+      let activated = false;
 
-      if (code) {
-        await supabase.auth.exchangeCodeForSession(code);
+      if (tokens) {
+        const { error } = await supabase.auth.setSession({
+          access_token: tokens.accessToken,
+          refresh_token: tokens.refreshToken,
+        });
+        activated = !error;
+      } else {
+        const tokenHashData = parseTokenHashFromUrl(url);
+        const code = parseAuthCodeFromUrl(url);
+
+        if (tokenHashData) {
+          const { error } = await supabase.auth.verifyOtp({
+            token_hash: tokenHashData.tokenHash,
+            type: tokenHashData.type,
+          });
+          activated = error ? await hasActiveSession() : true;
+        } else if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          // detectSessionInUrl may already have exchanged the code on web.
+          activated = error ? await hasActiveSession() : true;
+        } else if (showEmailConfirmed) {
+          activated = await hasActiveSession();
+        }
+      }
+
+      if (!activated) {
+        return;
+      }
+
+      clearAuthParamsFromBrowserUrl();
+
+      if (showEmailConfirmed && mountedRef.current) {
+        setEmailJustConfirmed(true);
       }
     };
 
-    void Linking.getInitialURL().then(activateSessionFromUrl);
+    const resolveInitialUrl = async () => {
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        return window.location.href;
+      }
+
+      return Linking.getInitialURL();
+    };
+
+    void resolveInitialUrl().then(activateSessionFromUrl);
 
     const subscription = Linking.addEventListener('url', ({ url }) => {
       void activateSessionFromUrl(url);
@@ -270,6 +327,26 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     return () => subscription.remove();
   }, []);
+
+  // Web PKCE: detectSessionInUrl may finish after the first URL pass.
+  useEffect(() => {
+    if (!session || Platform.OS !== 'web' || typeof window === 'undefined') {
+      return;
+    }
+
+    if (!isEmailConfirmationRedirect(window.location.href)) {
+      return;
+    }
+
+    clearAuthParamsFromBrowserUrl();
+    setEmailJustConfirmed(true);
+  }, [session]);
+
+  useEffect(() => {
+    if (!session && emailJustConfirmed) {
+      setEmailJustConfirmed(false);
+    }
+  }, [emailJustConfirmed, session]);
 
   const profileComplete = useMemo(() => {
     if (!profile) {
@@ -285,9 +362,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const value = useMemo(
     () => ({
+      acknowledgeEmailConfirmation,
       authError,
       authRetrying,
       bloodbankVerification,
+      emailJustConfirmed,
       initializing,
       profile,
       profileComplete,
@@ -297,9 +376,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       session,
     }),
     [
+      acknowledgeEmailConfirmation,
       authError,
       authRetrying,
       bloodbankVerification,
+      emailJustConfirmed,
       initializing,
       profile,
       profileComplete,

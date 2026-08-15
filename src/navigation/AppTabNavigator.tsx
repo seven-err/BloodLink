@@ -3,7 +3,6 @@ import { FileText, Home, Map, MessageCircle, User } from 'lucide-react-native';
 
 import { colors } from '@/constants/theme';
 import { MessagesScreen } from '@/screens/messages/MessagesScreen';
-import { NearbyDonorsMapScreen } from '@/screens/donor/NearbyDonorsMapScreen';
 import { ModeHomeScreen } from '@/screens/ModeHomeScreen';
 import { ModeRequestsScreen } from '@/screens/ModeRequestsScreen';
 import { UserProfileScreen } from '@/screens/profile/UserProfileScreen';
@@ -31,6 +30,7 @@ export function AppTabNavigator() {
           backgroundColor: colors.card,
         },
         headerTintColor: colors.primaryDark,
+        lazy: true,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedLight,
         tabBarLabelStyle: {
@@ -66,7 +66,11 @@ export function AppTabNavigator() {
         }}
       />
       <Tab.Screen
-        component={NearbyDonorsMapScreen}
+        getComponent={() =>
+          // Keep MapLibre off the initial signed-in bundle until the Map tab opens.
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          require('@/screens/donor/NearbyDonorsMapScreen').NearbyDonorsMapScreen
+        }
         name="Map"
         options={{
           headerShown: false,

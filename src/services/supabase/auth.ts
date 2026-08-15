@@ -1,36 +1,29 @@
-import type { User } from '@supabase/supabase-js';
-import { makeRedirectUri } from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
-import { Platform } from 'react-native';
+import type { EmailOtpType, User } from '@supabase/supabase-js';
 
-import {
-  getAuthRedirectUrl,
-  parseAuthCodeFromUrl,
-  parseAuthTokensFromUrl,
-} from '@/utils/authRedirect';
+import { getAuthRedirectUrl } from '@/utils/authRedirect';
 
 import { supabase } from './client';
+import {
+  signInWithGooglePlatform,
+  signOutGooglePlatform,
+  type GoogleSignInResult,
+} from './googleAuth';
 
-WebBrowser.maybeCompleteAuthSession();
-
-const getOAuthRedirectUrl = () => {
-  if (Platform.OS === 'web') {
-    return getAuthRedirectUrl();
-  }
-
-  return makeRedirectUri({
-    path: 'auth/callback',
-    scheme: 'bloodlink',
-  });
-};
+export type { GoogleSignInResult };
 
 export const signUpWithEmail = (
   email: string,
   password: string,
   fullName: string,
   phone?: string,
-) =>
-  supabase.auth.signUp({
+) => {
+  const emailRedirectTo = getAuthRedirectUrl();
+
+  if (__DEV__) {
+    console.info('[auth] signup emailRedirectTo:', emailRedirectTo);
+  }
+
+  return supabase.auth.signUp({
     email,
     password,
     options: {
@@ -38,9 +31,10 @@ export const signUpWithEmail = (
         full_name: fullName,
         phone,
       },
-      emailRedirectTo: getAuthRedirectUrl(),
+      emailRedirectTo,
     },
   });
+};
 
 /** True when Supabase accepted signup but did not create a new user (email already registered). */
 export const isDuplicateEmailSignup = (user: User | null) =>
@@ -59,93 +53,47 @@ export const getSignupErrorMessage = (message: string) => {
   return message;
 };
 
-export const resendSignupConfirmation = (email: string) =>
-  supabase.auth.resend({
+export const resendSignupConfirmation = (email: string) => {
+  const emailRedirectTo = getAuthRedirectUrl();
+
+  if (__DEV__) {
+    console.info('[auth] resend emailRedirectTo:', emailRedirectTo);
+  }
+
+  return supabase.auth.resend({
     type: 'signup',
     email,
     options: {
-      emailRedirectTo: getAuthRedirectUrl(),
+      emailRedirectTo,
     },
+  });
+};
+
+export const verifyEmailOtp = (email: string, token: string, type: EmailOtpType = 'signup') =>
+  supabase.auth.verifyOtp({
+    email: email.trim(),
+    token: token.trim(),
+    type,
+  });
+
+export const verifyOtpWithTokenHash = (
+  token_hash: string,
+  type: EmailOtpType = 'signup',
+) =>
+  supabase.auth.verifyOtp({
+    token_hash,
+    type,
   });
 
 export const signInWithEmail = (email: string, password: string) =>
   supabase.auth.signInWithPassword({ email, password });
 
-export type GoogleSignInResult = {
-  cancelled?: boolean;
-  data: Awaited<ReturnType<typeof supabase.auth.setSession>>['data'] | null;
-  error: Error | null;
-};
-
-/** Opens Google OAuth via Supabase + system browser. Requires Google provider enabled in Supabase. */
-export const signInWithGoogle = async (): Promise<GoogleSignInResult> => {
-  const redirectTo = getOAuthRedirectUrl();
-
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo,
-      skipBrowserRedirect: true,
-      queryParams: {
-        access_type: 'offline',
-        prompt: 'select_account',
-      },
-    },
-  });
-
-  if (error) {
-    return { data: null, error: new Error(error.message) };
-  }
-
-  if (!data.url) {
-    return { data: null, error: new Error('Unable to start Google sign-in.') };
-  }
-
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    window.location.assign(data.url);
-    return { data: null, error: null };
-  }
-
-  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-
-  if (result.type === 'cancel' || result.type === 'dismiss') {
-    return { cancelled: true, data: null, error: null };
-  }
-
-  if (result.type !== 'success' || !('url' in result) || !result.url) {
-    return { data: null, error: new Error('Google sign-in did not complete.') };
-  }
-
-  const tokens = parseAuthTokensFromUrl(result.url);
-
-  if (tokens) {
-    const sessionResult = await supabase.auth.setSession({
-      access_token: tokens.accessToken,
-      refresh_token: tokens.refreshToken,
-    });
-
-    return {
-      data: sessionResult.data,
-      error: sessionResult.error ? new Error(sessionResult.error.message) : null,
-    };
-  }
-
-  const code = parseAuthCodeFromUrl(result.url);
-
-  if (code) {
-    const sessionResult = await supabase.auth.exchangeCodeForSession(code);
-
-    return {
-      data: sessionResult.data,
-      error: sessionResult.error ? new Error(sessionResult.error.message) : null,
-    };
-  }
-
-  return {
-    data: null,
-    error: new Error('Google sign-in did not return a valid session.'),
-  };
-};
+/**
+ * Continue with Google.
+ * Native: in-app account picker (requires a build with Google Sign-In linked).
+ * Web: browser OAuth.
+ */
+export const signInWithGoogle = (): Promise<GoogleSignInResult> => signInWithGooglePlatform();
 
 export const requestPhoneOtp = (phone: string) =>
   supabase.auth.signInWithOtp({
@@ -164,48 +112,14 @@ export const verifyPhoneOtp = (phone: string, token: string) =>
     type: 'sms',
   });
 
-const DEV_PHONE_AUTH_PASSWORD = 'BloodLinkPhoneBypass!';
-
-const phoneToDevEmail = (phone: string) => {
-  const digits = phone.replace(/\D/g, '');
-  return `phone+${digits}@bloodlink.app`;
-};
-
-/** Temporary bypass while SMS OTP is not configured. Creates or signs in a dev account. */
-export const bypassPhoneAuth = async (phone: string) => {
-  const email = phoneToDevEmail(phone);
-
-  const signInResult = await supabase.auth.signInWithPassword({
-    email,
-    password: DEV_PHONE_AUTH_PASSWORD,
-  });
-
-  if (signInResult.data.session) {
-    return signInResult;
-  }
-
-  const signUpResult = await supabase.auth.signUp({
-    email,
-    password: DEV_PHONE_AUTH_PASSWORD,
-    options: {
-      data: {
-        phone,
-      },
-    },
-  });
-
-  if (signUpResult.data.session) {
-    return signUpResult;
-  }
-
-  return signInResult.error ? signInResult : signUpResult;
-};
-
 export const getCurrentSession = () => supabase.auth.getSession();
 
 export const getCurrentUser = () => supabase.auth.getUser();
 
-export const signOut = () => supabase.auth.signOut();
+export const signOut = async () => {
+  await signOutGooglePlatform();
+  return supabase.auth.signOut();
+};
 
 export const updateAccountEmail = (email: string) =>
   supabase.auth.updateUser({

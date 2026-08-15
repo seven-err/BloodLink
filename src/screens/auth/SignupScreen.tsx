@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Check, Circle, Phone } from 'lucide-react-native';
 import { useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import {
   KeyboardAvoidingView,
   ScrollView,
@@ -14,6 +15,7 @@ import { z } from 'zod';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { FormTextInput } from '@/components/forms/FormTextInput';
 import { colors } from '@/constants/theme';
+import { useGoogleSignIn } from '@/hooks/useGoogleSignIn';
 import type { AuthStackParamList } from '@/navigation/types';
 import {
   getSignupErrorMessage,
@@ -22,11 +24,16 @@ import {
   signUpWithEmail,
 } from '@/services/supabase/auth';
 import { normalizePhoneNumber } from '@/utils/phone';
-import { signupPasswordSchema } from '@/utils/password';
+import {
+  getPasswordRequirementStatus,
+  signupPasswordSchema,
+} from '@/utils/password';
 import { AuthBrand } from './AuthBrand';
-import { AuthIcon, MutedIcon } from './icons';
+import { AuthDivider } from './AuthDivider';
+import { AuthIcon, MutedIcon, SocialIcon } from './icons';
 import { AuthTabs } from './AuthTabs';
 import { SecurityFooter } from './SecurityFooter';
+import { SocialButton } from './SocialButton';
 import { authStyles } from './styles';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Signup'>;
@@ -35,7 +42,8 @@ const schema = z
   .object({
     confirmPassword: z.string(),
     email: z.string().email('Enter a valid email address.'),
-    fullName: z.string().min(2, 'Full name is required.'),
+    firstName: z.string().min(1, 'First name is required.'),
+    lastName: z.string().min(1, 'Last name is required.'),
     password: signupPasswordSchema,
     phone: z.string().min(10, 'Enter a valid mobile number.'),
   })
@@ -48,13 +56,15 @@ type SignupValues = z.infer<typeof schema>;
 
 export function SignupScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
-  const [pendingConfirmationEmail, setPendingConfirmationEmail] = useState<string | null>(
-    null,
-  );
-  const [resentConfirmation, setResentConfirmation] = useState(false);
   const [loading, setLoading] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
+  const {
+    error: googleError,
+    loading: googleLoading,
+    setError: setGoogleError,
+    signIn: signInWithGooglePress,
+  } = useGoogleSignIn({ disabled: loading });
   const {
     control,
     handleSubmit,
@@ -63,18 +73,31 @@ export function SignupScreen({ navigation }: Props) {
     defaultValues: {
       confirmPassword: '',
       email: '',
-      fullName: '',
+      firstName: '',
+      lastName: '',
       password: '',
       phone: '',
     },
     resolver: zodResolver(schema),
   });
 
-  const onSubmit = async ({ email, fullName, password, phone }: SignupValues) => {
+  const passwordValue = useWatch({ control, name: 'password' }) ?? '';
+  const passwordRequirements = getPasswordRequirementStatus(passwordValue);
+  const showPasswordGuide = passwordValue.length > 0;
+  const displayError = error ?? googleError;
+
+  const onSubmit = async ({
+    email,
+    firstName,
+    lastName,
+    password,
+    phone,
+  }: SignupValues) => {
     setError(null);
-    setPendingConfirmationEmail(null);
-    setResentConfirmation(false);
+    setGoogleError(null);
     setLoading(true);
+
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
 
     try {
       const { data, error: signupError } = await signUpWithEmail(
@@ -99,13 +122,12 @@ export function SignupScreen({ navigation }: Props) {
           return;
         }
 
-        setResentConfirmation(true);
-        setPendingConfirmationEmail(email);
+        navigation.navigate('VerifyEmail', { email, resent: true });
         return;
       }
 
       if (!data.session) {
-        setPendingConfirmationEmail(email);
+        navigation.navigate('VerifyEmail', { email, resent: false });
         return;
       }
     } catch (error) {
@@ -126,55 +148,60 @@ export function SignupScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         <AuthBrand />
-        {pendingConfirmationEmail ? null : (
-          <>
-            <View style={styles.heading}>
-              <Text style={authStyles.title}>Create your account</Text>
-              <Text style={authStyles.subtitle}>Join BloodLink and be a hero today.</Text>
-            </View>
-            <AuthTabs
-              active="signup"
-              onLogin={() => navigation.navigate('Login')}
-              onSignup={() => undefined}
-            />
-          </>
-        )}
-        {pendingConfirmationEmail ? (
-          <View style={styles.confirmationCard}>
-            <Text style={authStyles.title}>Check your email</Text>
-            <Text style={authStyles.subtitle}>
-              {resentConfirmation
-                ? `We resent a confirmation link to ${pendingConfirmationEmail}.`
-                : `We sent a confirmation link to ${pendingConfirmationEmail}.`}
-            </Text>
-            <Text style={authStyles.success}>
-              Tap the confirmation link in your email to verify your account. Keep the BloodLink app
-              or web tab open (Expo web runs on port 8081). After confirming, log in with the same
-              email and password.
-            </Text>
-            <Text style={authStyles.helper}>
-              If you do not see the email, check your spam folder (including Promotions) or wait a
-              few minutes. Supabase sends from noreply@mail.app.supabase.io — add it to your safe
-              senders if needed.
-            </Text>
-            <PrimaryButton
-              title="Back to login"
-              onPress={() => navigation.navigate('Login')}
-            />
-          </View>
-        ) : (
+        <View style={styles.heading}>
+          <Text style={authStyles.title}>Create your account</Text>
+          <Text style={authStyles.subtitle}>Join BloodLink and be a hero today.</Text>
+        </View>
+        <AuthTabs
+          active="signup"
+          onLogin={() => navigation.navigate('Login')}
+          onSignup={() => undefined}
+        />
+        <View style={styles.socials}>
+          <SocialButton
+            disabled={googleLoading || loading}
+            icon={<Phone color={colors.foreground} size={20} />}
+            title="Continue with Phone number"
+            onPress={() => navigation.navigate('EnterPhone', { mode: 'signup' })}
+          />
+          <SocialButton
+            disabled={googleLoading || loading}
+            icon={<SocialIcon name="google" />}
+            loading={googleLoading}
+            title="Continue with Google"
+            onPress={() => void signInWithGooglePress()}
+          />
+        </View>
+        <AuthDivider />
         <View style={styles.form}>
           <Controller
             control={control}
-            name="fullName"
+            name="firstName"
             render={({ field: { onBlur, onChange, value } }) => (
               <FormTextInput
-                error={errors.fullName?.message}
+                autoComplete="given-name"
+                error={errors.firstName?.message}
                 label=""
                 leftIcon={<AuthIcon name="user" />}
                 onBlur={onBlur}
                 onChangeText={onChange}
-                placeholder="Full name"
+                placeholder="First name"
+                value={value}
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="lastName"
+            render={({ field: { onBlur, onChange, value } }) => (
+              <FormTextInput
+                autoComplete="family-name"
+                error={errors.lastName?.message}
+                label=""
+                leftIcon={<AuthIcon name="user" />}
+                onBlur={onBlur}
+                onChangeText={onChange}
+                placeholder="Last name"
                 value={value}
               />
             )}
@@ -192,7 +219,7 @@ export function SignupScreen({ navigation }: Props) {
                 leftIcon={<AuthIcon name="email" />}
                 onBlur={onBlur}
                 onChangeText={onChange}
-                placeholder="Email address"
+                placeholder="you.email@example.com"
                 value={value}
               />
             )}
@@ -209,7 +236,7 @@ export function SignupScreen({ navigation }: Props) {
                 leftIcon={<AuthIcon name="phone" />}
                 onBlur={onBlur}
                 onChangeText={onChange}
-                placeholder="Mobile number"
+                placeholder="09xxxxxx"
                 value={value}
               />
             )}
@@ -226,12 +253,38 @@ export function SignupScreen({ navigation }: Props) {
                 onChangeText={onChange}
                 onRightIconPress={() => setPasswordVisible((visible) => !visible)}
                 placeholder="Create password"
-                rightIcon={<MutedIcon name={passwordVisible ? 'eye-off' : 'eye'} />}
+                rightIcon={<MutedIcon name={passwordVisible ? 'eye' : 'eye-off'} />}
                 secureTextEntry={!passwordVisible}
                 value={value}
               />
             )}
           />
+          {showPasswordGuide ? (
+            <View style={styles.passwordGuide}>
+              <Text style={styles.passwordGuideTitle}>Password must include:</Text>
+              {passwordRequirements.map((requirement) => (
+                <View key={requirement.id} style={styles.requirementRow}>
+                  {requirement.met ? (
+                    <Check color={colors.success} size={16} strokeWidth={2.5} />
+                  ) : (
+                    <Circle color={colors.mutedLight} size={16} strokeWidth={2} />
+                  )}
+                  <Text
+                    style={[
+                      styles.requirementText,
+                      requirement.met ? styles.requirementMet : null,
+                    ]}
+                  >
+                    {requirement.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.passwordHint}>
+              Use at least 8 characters with upper and lowercase letters and a number.
+            </Text>
+          )}
           <Controller
             control={control}
             name="confirmPassword"
@@ -244,31 +297,30 @@ export function SignupScreen({ navigation }: Props) {
                 onChangeText={onChange}
                 onRightIconPress={() => setConfirmVisible((visible) => !visible)}
                 placeholder="Confirm password"
-                rightIcon={<MutedIcon name={confirmVisible ? 'eye-off' : 'eye'} />}
+                rightIcon={<MutedIcon name={confirmVisible ? 'eye' : 'eye-off'} />}
                 secureTextEntry={!confirmVisible}
                 value={value}
               />
             )}
           />
-          {error ? <Text style={authStyles.error}>{error}</Text> : null}
-          <PrimaryButton loading={loading} title="Sign Up" onPress={handleSubmit(onSubmit)} />
+          {displayError ? <Text style={authStyles.error}>{displayError}</Text> : null}
+          <PrimaryButton
+            disabled={googleLoading}
+            loading={loading}
+            title="Sign Up"
+            onPress={handleSubmit(onSubmit)}
+          />
         </View>
-        )}
         <SecurityFooter />
-        {!pendingConfirmationEmail && (
-          <Text style={styles.termsText}>
-            By signing up, you agree to our <Text style={styles.termsLink}>Terms of Service</Text> and <Text style={styles.termsLink}>Privacy Policy</Text>
-          </Text>
-        )}
+        <Text style={styles.termsText}>
+          By signing up, you agree to our <Text style={styles.termsLink}>Terms of Service</Text> and <Text style={styles.termsLink}>Privacy Policy</Text>
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  confirmationCard: {
-    gap: 18,
-  },
   content: {
     flexGrow: 1,
     gap: 24,
@@ -282,6 +334,45 @@ const styles = StyleSheet.create({
   heading: {
     alignItems: 'center',
     gap: 8,
+  },
+  socials: {
+    gap: 14,
+  },
+  passwordGuide: {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  passwordGuideTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  passwordHint: {
+    color: colors.mutedLight,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: -4,
+  },
+  requirementMet: {
+    color: colors.success,
+    fontWeight: '600',
+  },
+  requirementRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  requirementText: {
+    color: colors.mutedLight,
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
   },
   screen: {
     backgroundColor: colors.background,

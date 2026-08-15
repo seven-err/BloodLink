@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+﻿import { StyleSheet } from 'react-native';
 
 import { colors, radii, shadows } from '@/constants/theme';
 
@@ -40,7 +40,7 @@ export const profileScreenStyles = StyleSheet.create({
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 16,
-    padding: 16,
+    padding: 20,
     ...shadows.card,
   },
   cardTitle: {
@@ -112,6 +112,7 @@ export const profileScreenStyles = StyleSheet.create({
   },
   editProfileButton: {
     alignItems: 'center',
+    backgroundColor: '#f8fafc',
     borderColor: colors.border,
     borderRadius: 12,
     borderWidth: 1,
@@ -215,14 +216,37 @@ export const profileScreenStyles = StyleSheet.create({
     backgroundColor: colors.border,
     height: 1,
   },
-  overviewCard: {
+  profileCard: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: radii.cardLg,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 20,
+    padding: 20,
+    ...shadows.card,
+  },
+  modeCard: {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: radii.card,
     borderWidth: 1,
     gap: 16,
     padding: 20,
     ...shadows.card,
+  },
+  statsCard: {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    padding: 20,
+    ...shadows.card,
+  },
+  statDivider: {
+    backgroundColor: colors.border,
+    height: '60%',
+    width: 1,
+    alignSelf: 'center',
   },
   overviewHeader: {
     alignItems: 'flex-start',
@@ -266,7 +290,7 @@ export const profileScreenStyles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    gap: 16,
+    gap: 20,
     paddingBottom: 32,
     paddingHorizontal: 24,
     paddingTop: 24,
@@ -296,10 +320,25 @@ export const profileScreenStyles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
   },
+  statValuePrimary: {
+    color: colors.primary,
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  statValueSuccess: {
+    color: colors.success,
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  statValueWarning: {
+    color: colors.warning,
+    fontSize: 22,
+    fontWeight: '800',
+  },
   userName: {
     color: colors.foreground,
     flexShrink: 1,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
   },
   verifiedBadge: {

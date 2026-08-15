@@ -154,10 +154,10 @@ export function DonorRequestFeedScreen({ navigation }: Props) {
     return null;
   }, [profile?.latitude, profile?.longitude]);
 
-  const loadRequests = useCallback(async (isRefresh = false) => {
+  const loadRequests = useCallback(async (isRefresh = false, isSilent = false) => {
     if (isRefresh) {
       setRefreshing(true);
-    } else {
+    } else if (!isSilent) {
       setLoading(true);
     }
 
@@ -167,7 +167,9 @@ export function DonorRequestFeedScreen({ navigation }: Props) {
 
     if (fetchError) {
       setError(fetchError.message);
-      setRequests([]);
+      if (!isSilent) {
+        setRequests([]);
+      }
     } else {
       setRequests(data ?? []);
     }
@@ -178,7 +180,9 @@ export function DonorRequestFeedScreen({ navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      void loadRequests();
+      // The first time it runs, `loading` is already true. 
+      // For subsequent focuses, we do a silent fetch to update data without a loading skeleton.
+      void loadRequests(false, true);
     }, [loadRequests]),
   );
 

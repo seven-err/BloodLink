@@ -1,51 +1,137 @@
 const MAX_MESSAGE_LENGTH = 1000;
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_REPLY_TOKENS = 500;
+const MIN_AGE = 16;
+const MAX_AGE = 65;
+const MIN_WEIGHT_KG = 50;
+const TRANSFUSION_WAIT_MONTHS = 12;
+const DONATION_INTERVAL_DAYS = 56;
+
+const BLOOD_TYPES = ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'];
+
+/** Donor blood type → recipient types that can receive from that donor */
+const DONOR_CAN_DONATE_TO = {
+  'O-': ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'],
+  'O+': ['O+', 'A+', 'B+', 'AB+'],
+  'A-': ['A-', 'A+', 'AB-', 'AB+'],
+  'A+': ['A+', 'AB+'],
+  'B-': ['B-', 'B+', 'AB-', 'AB+'],
+  'B+': ['B+', 'AB+'],
+  'AB-': ['AB-', 'AB+'],
+  'AB+': ['AB+'],
+};
+
+/** Recipient blood type → donor types that can give to that recipient */
+const RECIPIENT_CAN_RECEIVE_FROM = {
+  'O-': ['O-'],
+  'O+': ['O-', 'O+'],
+  'A-': ['O-', 'A-'],
+  'A+': ['O-', 'O+', 'A-', 'A+'],
+  'B-': ['O-', 'B-'],
+  'B+': ['O-', 'O+', 'B-', 'B+'],
+  'AB-': ['O-', 'A-', 'B-', 'AB-'],
+  'AB+': ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'],
+};
 
 const HEMIE_SYSTEM_PROMPT = `You are Hemie, the BloodLink AI assistant inside the BloodLink mobile app.
 
-Your ONLY goal is to help users with BloodLink and blood donation coordination:
-- Donor eligibility education (age, weight, transfusion wait, general health screening)
-- ABO/Rh blood type compatibility basics
-- How to use BloodLink (availability toggle, create/respond to blood requests, map, chat, QR verification, profile)
-- Donation day preparation (ID, hydration, rest, what to expect)
-- Urgency and emergency workflow guidance inside the app
+Your ONLY goal is to help users with BloodLink and blood donation coordination.
+
+BloodLink features you may describe (do not invent others):
+- Roles: donor, recipient, healthcare/blood bank personnel, admin
+- Donor: availability toggle, blood type profile, request feed, map of nearby donors/requests, chat, QR donation verification, Hemie AI
+- Recipient: create blood requests (blood type, units, urgency, hospital/location), browse compatible nearby donors, chat
+- Matching ranks compatible donors by blood compatibility, proximity, availability, eligibility, urgency, and recent donation restrictions
+- Maps use OpenStreetMap
+- Auth: phone OTP, Google, email/password
+
+Grounded donation education (use these exact rules; do not invent local hospital policy):
+- Age 16–65 (16–17 need parental/guardian consent)
+- Weight at least 50 kg
+- Wait 12 months after a blood transfusion before donating
+- Wait ${DONATION_INTERVAL_DAYS} days between whole-blood donations
+- Final clearance always depends on on-site blood bank screening
 
 Hard rules:
-1. Stay strictly on BloodLink / blood donation topics. If asked about anything else (coding, weather, sports, homework, general chat, unrelated medical advice), briefly refuse and redirect to BloodLink topics.
-2. You are NOT a doctor. Do not diagnose, prescribe, or triage medical conditions. For emergencies, tell the user to contact local emergency services (911) or healthcare personnel immediately.
-3. Do not invent hospital policies, lab results, or BloodLink features that were not described to you.
-4. Prefer short, clear mobile-friendly answers (usually under 120 words). Use bullet points when listing requirements.
-5. If user context is provided, you may personalize eligibility education, but always say final clearance depends on on-site screening.
+1. Stay strictly on BloodLink / blood donation topics. If asked about anything else, briefly refuse and redirect.
+2. You are NOT a doctor. Do not diagnose, prescribe, or triage. For emergencies, tell the user to contact local emergency services (911) or healthcare personnel immediately.
+3. Do not invent hospital policies, lab results, match scores, or BloodLink features not listed above.
+4. Prefer short, clear mobile-friendly answers (usually under 120 words). Use bullet points for requirements.
+5. If user context is provided, personalize using ONLY that context. If a fact is missing, say so.
 6. Never ask for passwords, OTP codes, or unnecessary sensitive health details.
-7. If unsure, say so and suggest contacting blood bank / healthcare staff through BloodLink or in person.`;
+7. If unsure, say so and suggest contacting blood bank / healthcare staff through BloodLink or in person.
+8. When the "Grounded facts for this turn" or "Required message for this turn" block is present, treat it as authoritative and base your answer on it.
+9. Language: Detect the language of the user's latest message (including Tagalog/Filipino, Cebuano, Spanish, Chinese, and mixed forms like Taglish). Reply in that same language. If the message mixes languages, follow the dominant language of the latest user message. Keep product names (BloodLink, Hemie, QR) unchanged. Translate educational content accurately — never change medical facts when translating.`;
 
 const BLOOD_COMPATIBILITY_NOTES = `
-Donor-to-recipient red cell compatibility (simplified education):
-- O- can donate to all types
-- O+ can donate to positive types
+Donor-to-recipient red cell compatibility (authoritative for BloodLink education):
+- O- → all types (universal donor)
+- O+ → O+, A+, B+, AB+
 - A- → A-, A+, AB-, AB+
 - A+ → A+, AB+
 - B- → B-, B+, AB-, AB+
 - B+ → B+, AB+
 - AB- → AB-, AB+
-- AB+ → AB+
+- AB+ → AB+ only (universal recipient as a patient)
 `;
 
 const DONOR_ELIGIBILITY_NOTES = `
-General BloodLink donor eligibility education:
-- Age 16–65 (16–17 need parental/guardian consent)
-- Weight at least 50 kg
-- Wait 12 months after a blood transfusion before donating
+BloodLink donor eligibility education:
+- Age ${MIN_AGE}–${MAX_AGE} (${MIN_AGE}–17 need parental/guardian consent)
+- Weight at least ${MIN_WEIGHT_KG} kg
+- Wait ${TRANSFUSION_WAIT_MONTHS} months after a blood transfusion
+- Wait ${DONATION_INTERVAL_DAYS} days between whole-blood donations
 - Be in good general health on donation day
 Final approval always depends on blood bank screening.
 `;
 
+const BLOODLINK_HOWTO_NOTES = `
+BloodLink how-to (authoritative):
+- Availability: donors turn on Donation Availability from Home when ready to respond.
+- Create request: recipients use Create blood request on Recipient Home (blood type, units, urgency, hospital, location).
+- Matching: BloodLink surfaces compatible open requests/donors using ABO/Rh rules above.
+- Map: Map tab / nearby donors map shows location context via OpenStreetMap.
+- Chat: Messages tab for donor–requester communication; Hemie opens from the Hemie button.
+- QR: follow on-screen QR flow at the donation site with authorized personnel.
+`;
+
 const OFF_TOPIC_PATTERN =
-  /\b(weather|recipe|crypto|bitcoin|stock market|homework|essay|poem|joke|movie|spotify|fortnite|minecraft|write (me )?(code|python|javascript)|who (won|is the president))\b/i;
+  /\b(weather|recipe|crypto|bitcoin|stock market|homework|essay|poem|joke|movie|spotify|fortnite|minecraft|write (me )?(code|python|javascript)|who (won|is the president)|panahon|biro|pelikula)\b/i;
 
 const EMERGENCY_PATTERN =
-  /\b(chest pain|can'?t breathe|not breathing|unconscious|severe bleeding|stroke|heart attack|overdose)\b/i;
+  /\b(chest pain|can'?t breathe|not breathing|unconscious|severe bleeding|stroke|heart attack|overdose|hirap huminga|atake sa puso|matinding pagdurugo|nawalan ng malay)\b/i;
+
+// Matches English + common Tagalog/Cebuano variants, including "pwede ba kong mag donate"
+const ELIGIBILITY_PATTERN =
+  /\b(eligib\w*|can i donate|am i able to donate|qualif\w*|requirements? to donate|allowed to donate|fit to donate|kwalipikado|(?:pwede|maaari)\b.{0,48}(?:mag[-\s]?donate|magbigay|\bdonate\b)|(?:ako(?:ng)?|ko(?:ng)?)\b.{0,24}(?:mag[-\s]?donate|magbigay|\bdonate\b)|karapat-dapat.{0,36}(?:mag[-\s]?donate|\bdonate\b))/i;
+
+const COMPATIBILITY_PATTERN =
+  /\b(match\w*|compatib\w*|blood\s*types?|abo(?:\s*\/?\s*rh)?|rh factor|who can (i |receive|donate)|universal donor|universal recipient|can (i |someone )?(give|receive|donate)|donate to|receive from|uri ng dugo|blood\s*type|tumutugma|compatible)\b/i;
+
+const REQUEST_PATTERN =
+  /\b((create|make|post|submit).{0,24}request|blood request|request blood|need blood|gumawa.{0,24}(request|kahilingan)|kailangan (ng )?dugo|mag-?request ng dugo)\b/i;
+
+const PREP_PATTERN =
+  /\b(bring|before donat\w*|prepar\w*|what (should|do) i (bring|do)|donation day|hydrate|ano (ang )?dapat (dalhin|gawin)|bago mag[-\s]?donate|maghanda)\b/i;
+
+const AVAILABILITY_PATTERN =
+  /\b(availability|available to donate|donation availability|toggle|available (ba )?(ako|to donate)|i-?on ang availability)\b/i;
+
+const QR_PATTERN = /\b(qr|verify donation|verification code|scan code|i-?scan|beripikasyon)\b/i;
+
+const INTERVAL_PATTERN =
+  /\b(how (soon|often|long).{0,40}(donat|again)|between donations|donation interval|wait (to|before) donat|56 day|8 week|gaano (katagal|kadalas).{0,40}(donat|magbigay)|kailan (ulit|pwede).{0,20}donat)\b/i;
+
+const MAP_PATTERN =
+  /\b(map|nearby donor|find donor|location|openstreetmap|mapa|malapit na donor|hanapin ang donor)\b/i;
+
+const CHAT_PATTERN = /\b(chat|message|messaging|hemie|mag-?chat|mag-?message)\b/i;
+
+const GREETING_PATTERN =
+  /\b(hello|hi|hey|kumusta|kamusta|magandang (umaga|hapon|gabi)|hola|bonjour)\b|你好|こんにちは|안녕하세요/i;
+
+const HELP_PATTERN =
+  /\b(help|help me|tulong|tabang|assist( me)?|paano (ba )?(ito|gumana)|what can you (do|help))\b/i;
 
 function normalizeText(value) {
   return String(value || '')
@@ -53,107 +139,381 @@ function normalizeText(value) {
     .replace(/\s+/g, ' ');
 }
 
-function buildLocalEligibilityReply(context = {}) {
-  const requirements = [
-    'Age: 16 to 65 years old (16 and 17-year-olds require written parental or guardian consent).',
-    'Weight: At least 50 kg (110 lbs).',
-    'Wait 12 months from your last blood transfusion before donating.',
+/** Rough locale for local (non-LLM) replies: en | fil (covers Tagalog/Filipino/Taglish/Cebuano help cues). */
+function detectUserLocale(text) {
+  const normalized = normalizeText(text).toLowerCase();
+  if (!normalized) {
+    return 'en';
+  }
+
+  if (
+    /^(tabang|tulong)[!?.]*$/i.test(normalized) ||
+    /\b(tabang|unsa|asa|salamat kaayo)\b/i.test(normalized)
+  ) {
+    return 'fil';
+  }
+
+  if (
+    /\b(pwede|maaari|ako(?:ng)?|ko(?:ng)?|tulong|kumusta|kamusta|dugo|opo|\bpo\b|paano|ano|salamat|mag[-\s]?donate|magbigay|ba ako|ba ko)\b/i.test(
+      normalized,
+    )
+  ) {
+    return 'fil';
+  }
+
+  return 'en';
+}
+
+function normalizeBloodType(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim().toUpperCase();
+  return BLOOD_TYPES.includes(normalized) ? normalized : null;
+}
+
+function parseDateOnly(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  const dateOnly = trimmed.slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
+    return null;
+  }
+
+  const [year, month, day] = dateOnly.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
+function calculateAge(birthdate) {
+  const born = parseDateOnly(birthdate);
+  if (!born) {
+    return null;
+  }
+
+  const today = new Date();
+  let age = today.getFullYear() - born.getUTCFullYear();
+  const monthDiff = today.getMonth() - born.getUTCMonth();
+
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < born.getUTCDate())) {
+    age -= 1;
+  }
+
+  return age;
+}
+
+function getDaysUntilNextEligible(lastDonationAt) {
+  const lastDonation = lastDonationAt ? new Date(lastDonationAt) : null;
+  if (!lastDonation || Number.isNaN(lastDonation.getTime())) {
+    return null;
+  }
+
+  const eligibleDate = new Date(lastDonation);
+  eligibleDate.setDate(eligibleDate.getDate() + DONATION_INTERVAL_DAYS);
+  eligibleDate.setHours(0, 0, 0, 0);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const daysRemaining = Math.ceil((eligibleDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.max(0, daysRemaining);
+}
+
+function isTransfusionWaitComplete(lastTransfusionDate) {
+  if (!lastTransfusionDate) {
+    return true;
+  }
+
+  const transfusionDate = parseDateOnly(lastTransfusionDate);
+  if (!transfusionDate) {
+    return false;
+  }
+
+  const waitUntil = new Date(transfusionDate);
+  waitUntil.setUTCMonth(waitUntil.getUTCMonth() + TRANSFUSION_WAIT_MONTHS);
+
+  return Date.now() >= waitUntil.getTime();
+}
+
+function getEligibilityIssues(context = {}) {
+  const issues = [];
+  const age = context.birthdate ? calculateAge(context.birthdate) : null;
+
+  if (context.birthdate) {
+    if (age === null) {
+      issues.push('Enter a valid birthdate in your profile.');
+    } else if (age < MIN_AGE || age > MAX_AGE) {
+      issues.push(`Donors must be between ${MIN_AGE} and ${MAX_AGE} years old.`);
+    } else if (age === 16 || age === 17) {
+      issues.push('Parental or guardian written consent is required for donors aged 16 or 17.');
+    }
+  }
+
+  if (context.weightKg != null) {
+    const weightKg = Number(context.weightKg);
+    if (!Number.isFinite(weightKg) || weightKg < MIN_WEIGHT_KG) {
+      issues.push(`Weight must be at least ${MIN_WEIGHT_KG} kg (110 lbs).`);
+    }
+  }
+
+  if (context.lastTransfusionDate && !isTransfusionWaitComplete(context.lastTransfusionDate)) {
+    issues.push(
+      `You must wait ${TRANSFUSION_WAIT_MONTHS} months after a blood transfusion before donating.`,
+    );
+  }
+
+  const daysUntilEligible = getDaysUntilNextEligible(context.lastDonationAt);
+  if (daysUntilEligible != null && daysUntilEligible > 0) {
+    issues.push(
+      `Wait ${daysUntilEligible} more day${daysUntilEligible === 1 ? '' : 's'} before your next whole-blood donation (${DONATION_INTERVAL_DAYS}-day interval).`,
+    );
+  }
+
+  return issues;
+}
+
+function buildLocalEligibilityReply(context = {}, locale = 'en') {
+  const requirementsEn = [
+    `Age: ${MIN_AGE} to ${MAX_AGE} years old (${MIN_AGE} and 17-year-olds require written parental or guardian consent).`,
+    `Weight: At least ${MIN_WEIGHT_KG} kg (110 lbs).`,
+    `Wait ${TRANSFUSION_WAIT_MONTHS} months from your last blood transfusion before donating.`,
+    `Wait ${DONATION_INTERVAL_DAYS} days between whole-blood donations.`,
     'Be in good general health on donation day.',
   ];
+  const requirementsFil = [
+    `Edad: ${MIN_AGE} hanggang ${MAX_AGE} taong gulang (kailangan ng written parental/guardian consent ang ${MIN_AGE}–17).`,
+    `Timbang: Hindi bababa sa ${MIN_WEIGHT_KG} kg (110 lbs).`,
+    `Maghintay ng ${TRANSFUSION_WAIT_MONTHS} buwan pagkatapos ng blood transfusion bago mag-donate.`,
+    `Maghintay ng ${DONATION_INTERVAL_DAYS} araw sa pagitan ng whole-blood donations.`,
+    'Dapat maganda ang general health sa araw ng donation.',
+  ];
 
-  if (!context.birthdate || context.weightKg == null) {
-    return `General donor eligibility includes:\n\n${requirements.map((item) => `• ${item}`).join('\n')}\n\nComplete your profile so I can give more personalized guidance. Final clearance still depends on blood bank screening.`;
-  }
+  const hasProfileBasics = Boolean(context.birthdate) && context.weightKg != null;
 
-  const issues = [];
-  const birthdate = String(context.birthdate);
-  const weightKg = Number(context.weightKg);
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(birthdate)) {
-    const [year, month, day] = birthdate.split('-').map(Number);
-    const born = new Date(Date.UTC(year, month - 1, day));
-    const today = new Date();
-    let age = today.getFullYear() - born.getFullYear();
-    const monthDiff = today.getMonth() - born.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < born.getDate())) {
-      age -= 1;
+  if (!hasProfileBasics) {
+    if (locale === 'fil') {
+      return `General donor eligibility:\n\n${requirementsFil.map((item) => `• ${item}`).join('\n')}\n\nKumpletuhin ang profile mo para mas personal ang gabay. Final clearance pa rin ang blood bank screening.`;
     }
-
-    if (age < 16 || age > 65) {
-      issues.push('Your age may be outside the usual 16–65 donation range.');
-    } else if (age === 16 || age === 17) {
-      issues.push('Donors aged 16–17 typically need parental or guardian consent.');
-    }
+    return `General donor eligibility includes:\n\n${requirementsEn.map((item) => `• ${item}`).join('\n')}\n\nComplete your profile so I can give more personalized guidance. Final clearance still depends on blood bank screening.`;
   }
 
-  if (!Number.isFinite(weightKg) || weightKg < 50) {
-    issues.push('Donors usually need to weigh at least 50 kg.');
-  }
+  const issues = getEligibilityIssues(context);
 
   if (issues.length === 0) {
-    return 'Based on your profile, you meet the basic BloodLink eligibility requirements. Final approval still depends on a health screening on donation day.';
+    if (locale === 'fil') {
+      return 'Base sa BloodLink profile mo, pasok ka sa basic eligibility checks (edad, timbang, transfusion wait, at donation interval). Final approval pa rin ang health screening sa araw ng donation.';
+    }
+    return 'Based on your BloodLink profile, you meet the basic eligibility checks (age, weight, transfusion wait, and donation interval). Final approval still depends on a health screening on donation day.';
+  }
+
+  if (locale === 'fil') {
+    return `Ito ang mga dapat mong i-review:\n\n${issues.map((issue) => `• ${issue}`).join('\n')}\n\nPwede mong i-update ang profile o makipag-usap sa blood bank staff para sa buong assessment.`;
   }
 
   return `Here are eligibility items to review:\n\n${issues.map((issue) => `• ${issue}`).join('\n')}\n\nYou can update your profile or speak with staff at the blood bank for a full assessment.`;
 }
 
-function getLocalHemieReply(question, context = {}) {
-  const normalized = normalizeText(question).toLowerCase();
+function buildCompatibilityReply(context = {}, locale = 'en') {
+  const bloodType = normalizeBloodType(context.bloodType);
+
+  if (bloodType) {
+    if (context.role === 'recipient') {
+      const donors = RECIPIENT_CAN_RECEIVE_FROM[bloodType].join(', ');
+      if (locale === 'fil') {
+        return `Ang blood type mo ay ${bloodType}. Bilang recipient, pwede kang tumanggap ng red cells mula sa: ${donors}.\n\nGinagamit ito ng BloodLink para ipakita ang compatible nearby donors. O- ang universal donor; AB+ ang universal recipient.`;
+      }
+      return `Your blood type is ${bloodType}. As a recipient, you can receive red cells from: ${donors}.\n\nBloodLink uses this ABO/Rh matching to surface compatible nearby donors. O- is the universal donor type; AB+ is the universal recipient type.`;
+    }
+
+    const recipients = DONOR_CAN_DONATE_TO[bloodType].join(', ');
+    if (locale === 'fil') {
+      return `Ang blood type mo ay ${bloodType}. Bilang donor, pwede kang magbigay ng red cells sa: ${recipients}.\n\nGinagamit ito ng BloodLink para ipakita ang compatible open requests. O- ang universal donor; AB+ ang universal recipient.`;
+    }
+    return `Your blood type is ${bloodType}. As a donor, you can give red cells to: ${recipients}.\n\nBloodLink uses this ABO/Rh matching to surface compatible open requests. O- is the universal donor type; AB+ is the universal recipient type.`;
+  }
+
+  if (locale === 'fil') {
+    return 'Ang blood matching ay sumusunod sa ABO at Rh compatibility. O- ay pwedeng mag-donate sa lahat (universal donor). AB+ ay pwedeng tumanggap mula sa lahat (universal recipient). I-set ang blood type mo sa Profile para sa personalized guidance.';
+  }
+
+  return 'Blood matching follows ABO and Rh compatibility. O- can donate to all types (universal donor). AB+ can receive from all types (universal recipient). BloodLink uses your profile blood type to surface compatible requests and donors. Set your blood type in Profile for personalized guidance.';
+}
+
+function buildDonationIntervalReply(context = {}, locale = 'en') {
+  const daysUntilEligible = getDaysUntilNextEligible(context.lastDonationAt);
+
+  if (daysUntilEligible == null) {
+    if (locale === 'fil') {
+      return `May ${DONATION_INTERVAL_DAYS}-day wait ang BloodLink sa pagitan ng whole-blood donations. Kung wala kang recent donation (o hindi pa naka-log), baka pwede ka na—kumpirmahin sa on-site screening.`;
+    }
+    return `BloodLink follows a ${DONATION_INTERVAL_DAYS}-day wait between whole-blood donations. If you have not donated recently (or have not logged a donation), you may be ready now—confirm during on-site screening.`;
+  }
+
+  if (daysUntilEligible === 0) {
+    if (locale === 'fil') {
+      return `Base sa last donation mo, tapos na ang ${DONATION_INTERVAL_DAYS}-day wait at pwede ka nang mag-donate ulit, subject sa on-site screening.`;
+    }
+    return `Based on your last donation on file, you have completed the ${DONATION_INTERVAL_DAYS}-day wait and may donate again, subject to on-site screening.`;
+  }
+
+  if (locale === 'fil') {
+    return `Base sa last donation mo, maghintay pa ng ${daysUntilEligible} araw bago ang susunod na whole-blood donation (${DONATION_INTERVAL_DAYS}-day interval ang BloodLink).`;
+  }
+
+  return `Based on your last donation on file, wait ${daysUntilEligible} more day${daysUntilEligible === 1 ? '' : 's'} before your next whole-blood donation (BloodLink uses a ${DONATION_INTERVAL_DAYS}-day interval).`;
+}
+
+function getHelpReply(locale = 'en') {
+  if (locale === 'fil') {
+    return 'Ako si Hemie, BloodLink assistant mo. Magtanong tungkol sa eligibility, blood matching, donation timing, paggawa ng blood request, preparation, o paano gamitin ang BloodLink.';
+  }
+  return 'Hello! Ask me about eligibility, blood matching, donation timing, creating requests, preparation, or how BloodLink works.';
+}
+
+function getFallbackHelpReply(locale = 'en') {
+  if (locale === 'fil') {
+    return 'Matutulungan kita sa donor eligibility, 56-day donation interval, blood type matching, paggawa ng blood request, donation preparation, at paggamit ng BloodLink. Subukan ang suggested questions o magtanong sa sarili mong salita.';
+  }
+  return 'I can help with donor eligibility, the 56-day donation interval, blood type matching, creating blood requests, donation preparation, and using BloodLink. Try one of the suggested questions or ask in your own words.';
+}
+
+function getGroundedHemieReply(question, context = {}, options = {}) {
+  const normalized = normalizeText(question);
+  const locale = options.preferLocalLanguage === false ? 'en' : detectUserLocale(question);
 
   if (EMERGENCY_PATTERN.test(normalized)) {
-    return 'This sounds like a medical emergency. Contact local emergency services (911) or healthcare personnel immediately. Hemie cannot provide emergency medical care.';
+    return {
+      reply:
+        locale === 'fil'
+          ? 'Parang medical emergency ito. Tumawag agad sa local emergency services (911) o healthcare personnel. Hindi makakapagbigay ang Hemie ng emergency medical care.'
+          : 'This sounds like a medical emergency. Contact local emergency services (911) or healthcare personnel immediately. Hemie cannot provide emergency medical care.',
+      kind: 'safety',
+    };
   }
 
   if (OFF_TOPIC_PATTERN.test(normalized)) {
-    return "I'm Hemie, your BloodLink assistant. I can only help with blood donation, eligibility, matching, and how to use BloodLink. What would you like to know about those?";
+    return {
+      reply:
+        locale === 'fil'
+          ? 'Ako si Hemie, BloodLink assistant mo. Tanging blood donation, eligibility, matching, at paggamit ng BloodLink ang kayang tulungan ko. Ano ang gusto mong malaman tungkol diyan?'
+          : "I'm Hemie, your BloodLink assistant. I can only help with blood donation, eligibility, matching, and how to use BloodLink. What would you like to know about those?",
+      kind: 'guardrail',
+    };
   }
 
-  if (normalized.includes('eligible') || normalized.includes('eligibility')) {
-    return buildLocalEligibilityReply(context);
+  if (ELIGIBILITY_PATTERN.test(normalized)) {
+    return { reply: buildLocalEligibilityReply(context, locale), kind: 'grounded' };
   }
 
-  if (
-    normalized.includes('matching') ||
-    normalized.includes('match') ||
-    normalized.includes('blood type') ||
-    normalized.includes('compatible')
-  ) {
-    return 'Blood matching follows ABO and Rh compatibility. Recipients need compatible blood types from donors. O- is the universal red cell donor type, while AB+ is the universal recipient type. BloodLink uses your blood type to surface compatible open requests.';
+  if (INTERVAL_PATTERN.test(normalized)) {
+    return { reply: buildDonationIntervalReply(context, locale), kind: 'grounded' };
   }
 
-  if (
-    (normalized.includes('create') && normalized.includes('request')) ||
-    normalized.includes('blood request')
-  ) {
+  if (COMPATIBILITY_PATTERN.test(normalized)) {
+    return { reply: buildCompatibilityReply(context, locale), kind: 'grounded' };
+  }
+
+  if (REQUEST_PATTERN.test(normalized)) {
     if (context.role === 'recipient') {
-      return 'Go to your home screen and tap Create blood request. Add the blood type, units needed, urgency, hospital details, and location so nearby compatible donors can respond.';
+      return {
+        reply:
+          locale === 'fil'
+            ? 'Pumunta sa Recipient Home at i-tap ang Create blood request. Ilagay ang blood type, units needed, urgency, hospital details, at location para makasagot ang nearby compatible donors.'
+            : 'Go to Recipient Home and tap Create blood request. Add the blood type, units needed, urgency, hospital details, and location so nearby compatible donors can respond.',
+        kind: 'grounded',
+      };
     }
 
-    return "Blood requests are created by recipients. If you need blood, switch to recipient mode or ask the patient's caregiver to create a request from the Recipient home screen.";
+    return {
+      reply:
+        locale === 'fil'
+          ? 'Ang blood requests ay ginagawa ng recipients. Kung kailangan ng dugo, gamitin ang recipient mode o hilingin sa caregiver ng patient na gumawa ng request mula sa Recipient Home.'
+          : "Blood requests are created by recipients. If you need blood, use recipient mode or ask the patient's caregiver to create a request from Recipient Home.",
+      kind: 'grounded',
+    };
   }
 
-  if (
-    normalized.includes('bring') ||
-    normalized.includes('before donating') ||
-    normalized.includes('prepare') ||
-    normalized.includes('preparation')
-  ) {
-    return 'Before donating, bring a valid ID, eat a healthy meal, drink plenty of water, and get adequate rest. Avoid alcohol before donation and disclose medications or recent illnesses during screening.';
+  if (PREP_PATTERN.test(normalized)) {
+    return {
+      reply:
+        locale === 'fil'
+          ? 'Bago mag-donate, magdala ng valid ID, kumain ng healthy meal, uminom ng maraming tubig, at magpahinga nang sapat. Iwasan ang alcohol bago mag-donate at i-disclose ang medications o recent illnesses sa screening.'
+          : 'Before donating, bring a valid ID, eat a healthy meal, drink plenty of water, and get adequate rest. Avoid alcohol before donation and disclose medications or recent illnesses during screening.',
+      kind: 'grounded',
+    };
   }
 
-  if (normalized.includes('availability') || normalized.includes('available')) {
-    return 'Turn on Donation Availability from your home screen when you are ready to respond to nearby requests. Keep your profile verified and up to date so recipients can match with you faster.';
+  if (AVAILABILITY_PATTERN.test(normalized)) {
+    return {
+      reply:
+        locale === 'fil'
+          ? 'I-on ang Donation Availability sa donor Home screen kapag handa ka nang tumugon sa nearby requests. Panatilihing updated ang profile at verification para mas mabilis kang ma-match.'
+          : 'Turn on Donation Availability from your donor Home screen when you are ready to respond to nearby requests. Keep your profile and verification up to date so recipients can match with you faster.',
+      kind: 'grounded',
+    };
   }
 
-  if (normalized.includes('qr') || normalized.includes('verify')) {
-    return 'BloodLink uses QR codes to help verify donation sessions. Follow the on-screen QR flow when you are at the donation site with authorized personnel.';
+  if (QR_PATTERN.test(normalized)) {
+    return {
+      reply:
+        locale === 'fil'
+          ? 'Gumagamit ang BloodLink ng QR codes para i-verify ang donation sessions. Sundan ang on-screen QR flow sa donation site kasama ang authorized personnel.'
+          : 'BloodLink uses QR codes to help verify donation sessions. Follow the on-screen QR flow when you are at the donation site with authorized personnel.',
+      kind: 'grounded',
+    };
   }
 
-  if (normalized.includes('hello') || normalized.includes('hi') || normalized.includes('hey')) {
-    return 'Hello! Ask me about eligibility, blood matching, creating requests, donation preparation, or how BloodLink works.';
+  if (MAP_PATTERN.test(normalized)) {
+    return {
+      reply:
+        locale === 'fil'
+          ? 'Gamitin ang Map tab para tingnan ang nearby donors at request locations sa OpenStreetMap. Pwede ring mag-browse ang recipients ng compatible nearby donors mula sa Recipient Home.'
+          : 'Use the Map tab to explore nearby donors and request locations on OpenStreetMap. Recipients can also browse compatible nearby donors from Recipient Home.',
+      kind: 'grounded',
+    };
   }
 
-  return 'I can help with donor eligibility, blood type matching, creating blood requests, donation preparation, and using BloodLink. Try one of the suggested questions or ask in your own words.';
+  if (CHAT_PATTERN.test(normalized) && !/\bhemie\b/i.test(normalized)) {
+    return {
+      reply:
+        locale === 'fil'
+          ? 'Buksan ang Messages tab para makipag-chat sa matched donors o requesters. Gamitin si Hemie (ang chat na ito) para sa donation education at BloodLink how-to questions.'
+          : 'Open the Messages tab to chat with matched donors or requesters. Use Hemie (this chat) for donation education and BloodLink how-to questions.',
+      kind: 'grounded',
+    };
+  }
+
+  if (HELP_PATTERN.test(normalized) || GREETING_PATTERN.test(normalized)) {
+    return {
+      reply: getHelpReply(locale),
+      kind: 'grounded',
+    };
+  }
+
+  return null;
+}
+
+function getLocalHemieReply(question, context = {}) {
+  const grounded = getGroundedHemieReply(question, context, { preferLocalLanguage: true });
+  if (grounded) {
+    return grounded.reply;
+  }
+
+  return getFallbackHelpReply(detectUserLocale(question));
 }
 
 function sanitizeContext(rawContext) {
@@ -167,8 +527,9 @@ function sanitizeContext(rawContext) {
     context.role = rawContext.role.trim().slice(0, 40);
   }
 
-  if (typeof rawContext.bloodType === 'string' && rawContext.bloodType.trim()) {
-    context.bloodType = rawContext.bloodType.trim().slice(0, 8);
+  const bloodType = normalizeBloodType(rawContext.bloodType);
+  if (bloodType) {
+    context.bloodType = bloodType;
   }
 
   if (typeof rawContext.birthdate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawContext.birthdate)) {
@@ -187,6 +548,18 @@ function sanitizeContext(rawContext) {
     /^\d{4}-\d{2}-\d{2}$/.test(rawContext.lastTransfusionDate)
   ) {
     context.lastTransfusionDate = rawContext.lastTransfusionDate;
+  }
+
+  if (typeof rawContext.lastDonationAt === 'string' && rawContext.lastDonationAt.trim()) {
+    const lastDonationAt = rawContext.lastDonationAt.trim();
+    const parsed = new Date(lastDonationAt);
+    if (!Number.isNaN(parsed.getTime())) {
+      context.lastDonationAt = lastDonationAt.slice(0, 32);
+    }
+  }
+
+  if (typeof rawContext.isAvailable === 'boolean') {
+    context.isAvailable = rawContext.isAvailable;
   }
 
   return context;
@@ -229,35 +602,238 @@ function sanitizeMessages(rawMessages) {
   return { messages };
 }
 
-function buildContextBlock(context) {
-  const lines = [DONOR_ELIGIBILITY_NOTES.trim(), BLOOD_COMPATIBILITY_NOTES.trim(), 'Current user context:'];
+function buildGroundedFactsBlock(question, context) {
+  // Keep authoritative facts in English for the LLM; it will reply in the user's language.
+  const grounded = getGroundedHemieReply(question, context, { preferLocalLanguage: false });
+  if (!grounded) {
+    return null;
+  }
+
+  if (grounded.kind === 'safety' || grounded.kind === 'guardrail') {
+    return `Required message for this turn (convey this exact meaning in the user's language; do not soften safety or topic limits):\n${grounded.reply}`;
+  }
+
+  if (grounded.kind !== 'grounded') {
+    return null;
+  }
+
+  return `Grounded facts for this turn (authoritative — answer from these, in the user's language):\n${grounded.reply}`;
+}
+
+function buildContextBlock(context, question = '') {
+  const lines = [
+    DONOR_ELIGIBILITY_NOTES.trim(),
+    BLOOD_COMPATIBILITY_NOTES.trim(),
+    BLOODLINK_HOWTO_NOTES.trim(),
+    'Current user context:',
+  ];
 
   lines.push(`- role: ${context.role || 'unknown'}`);
   lines.push(`- bloodType: ${context.bloodType || 'unknown'}`);
   lines.push(`- birthdate: ${context.birthdate || 'unknown'}`);
   lines.push(`- weightKg: ${context.weightKg != null ? context.weightKg : 'unknown'}`);
   lines.push(`- lastTransfusionDate: ${context.lastTransfusionDate || 'none on file'}`);
+  lines.push(`- lastDonationAt: ${context.lastDonationAt || 'none on file'}`);
+  lines.push(
+    `- daysUntilNextDonationEligible: ${
+      getDaysUntilNextEligible(context.lastDonationAt) ?? 'unknown (no last donation on file)'
+    }`,
+  );
+  lines.push(
+    `- isAvailable: ${typeof context.isAvailable === 'boolean' ? context.isAvailable : 'unknown'}`,
+  );
+
+  const bloodType = normalizeBloodType(context.bloodType);
+  if (bloodType) {
+    lines.push(`- canDonateTo: ${DONOR_CAN_DONATE_TO[bloodType].join(', ')}`);
+    lines.push(`- canReceiveFrom: ${RECIPIENT_CAN_RECEIVE_FROM[bloodType].join(', ')}`);
+  }
+
+  const eligibilityIssues = getEligibilityIssues(context);
+  lines.push(
+    `- eligibilityFlags: ${
+      eligibilityIssues.length ? eligibilityIssues.join(' | ') : 'no basic profile flags'
+    }`,
+  );
+
+  const groundedFacts = question ? buildGroundedFactsBlock(question, context) : null;
+  if (groundedFacts) {
+    lines.push(groundedFacts);
+  }
 
   return lines.join('\n');
 }
+
+const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite';
+const DEFAULT_GEMINI_FALLBACK_MODELS = [
+  'gemini-3.1-flash-lite',
+  'gemini-flash-latest',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+];
+const DEFAULT_OPENAI_COMPAT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
+const DEFAULT_GEMINI_NATIVE_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
 function isLlmConfigured(env = process.env) {
   return Boolean(env.HEMIE_LLM_API_KEY && env.HEMIE_LLM_API_KEY.trim());
 }
 
+function parseModelList(value) {
+  if (!value || typeof value !== 'string') {
+    return [];
+  }
+
+  return value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function uniqueModels(models) {
+  const seen = new Set();
+  const unique = [];
+
+  for (const model of models) {
+    if (!model || seen.has(model)) {
+      continue;
+    }
+    seen.add(model);
+    unique.push(model);
+  }
+
+  return unique;
+}
+
 function getLlmConfig(env = process.env) {
+  const apiKey = (env.HEMIE_LLM_API_KEY || '').trim();
+  const configuredBaseUrl = (env.HEMIE_LLM_BASE_URL || DEFAULT_OPENAI_COMPAT_BASE_URL).replace(/\/$/, '');
+  const primaryModel = (env.HEMIE_LLM_MODEL || DEFAULT_GEMINI_MODEL).trim();
+  const fallbackModels = parseModelList(env.HEMIE_LLM_FALLBACK_MODELS);
+  const models = uniqueModels([
+    primaryModel,
+    ...fallbackModels,
+    ...DEFAULT_GEMINI_FALLBACK_MODELS,
+  ]);
+
+  const usesGemini =
+    /generativelanguage\.googleapis\.com/i.test(configuredBaseUrl) ||
+    /^gemini-/i.test(primaryModel);
+
   return {
-    apiKey: (env.HEMIE_LLM_API_KEY || '').trim(),
-    baseUrl: (env.HEMIE_LLM_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai').replace(
-      /\/$/,
-      '',
-    ),
-    model: (env.HEMIE_LLM_MODEL || 'gemini-2.0-flash').trim(),
+    apiKey,
+    baseUrl: configuredBaseUrl,
+    models,
+    provider: usesGemini ? 'gemini' : 'openai-compat',
   };
 }
 
-async function callHemieLlm({ messages, context, fetchImpl = fetch, env = process.env }) {
-  const { apiKey, baseUrl, model } = getLlmConfig(env);
+function buildSystemPrompt(context, latestUserMessage) {
+  return `${HEMIE_SYSTEM_PROMPT}\n\n${buildContextBlock(context, latestUserMessage)}`;
+}
+
+function toGeminiContents(messages) {
+  const contents = [];
+
+  for (const message of messages) {
+    const role = message.role === 'assistant' ? 'model' : 'user';
+    const text = normalizeText(message.content);
+    if (!text) {
+      continue;
+    }
+
+    const last = contents[contents.length - 1];
+    if (last && last.role === role) {
+      last.parts[0].text = `${last.parts[0].text}\n${text}`;
+      continue;
+    }
+
+    contents.push({
+      role,
+      parts: [{ text }],
+    });
+  }
+
+  if (contents.length === 0 || contents[contents.length - 1].role !== 'user') {
+    throw new Error('Gemini request requires a latest user message.');
+  }
+
+  return contents;
+}
+
+function extractGeminiText(payload) {
+  const parts = payload?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) {
+    return '';
+  }
+
+  return normalizeText(
+    parts
+      .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+      .filter(Boolean)
+      .join('\n'),
+  );
+}
+
+function createLlmError(detail, status) {
+  const error = new Error(detail);
+  error.status = status;
+  return error;
+}
+
+async function callGeminiNative({
+  messages,
+  context,
+  model,
+  apiKey,
+  fetchImpl = fetch,
+}) {
+  const latestUserMessage = messages[messages.length - 1]?.content || '';
+  const url = `${DEFAULT_GEMINI_NATIVE_BASE_URL}/models/${encodeURIComponent(model)}:generateContent`;
+
+  const response = await fetchImpl(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      systemInstruction: {
+        parts: [{ text: buildSystemPrompt(context, latestUserMessage) }],
+      },
+      contents: toGeminiContents(messages),
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: MAX_REPLY_TOKENS,
+      },
+    }),
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw createLlmError(
+      payload?.error?.message || payload?.message || `Gemini request failed with status ${response.status}`,
+      response.status,
+    );
+  }
+
+  const reply = extractGeminiText(payload);
+  if (!reply) {
+    throw createLlmError('Gemini returned an empty reply.', 502);
+  }
+
+  return reply;
+}
+
+async function callOpenAiCompat({
+  messages,
+  context,
+  model,
+  apiKey,
+  baseUrl,
+  fetchImpl = fetch,
+}) {
+  const latestUserMessage = messages[messages.length - 1]?.content || '';
 
   const response = await fetchImpl(`${baseUrl}/chat/completions`, {
     method: 'POST',
@@ -267,11 +843,10 @@ async function callHemieLlm({ messages, context, fetchImpl = fetch, env = proces
     },
     body: JSON.stringify({
       model,
-      temperature: 0.3,
+      temperature: 0.2,
       max_tokens: MAX_REPLY_TOKENS,
       messages: [
-        { role: 'system', content: HEMIE_SYSTEM_PROMPT },
-        { role: 'system', content: buildContextBlock(context) },
+        { role: 'system', content: buildSystemPrompt(context, latestUserMessage) },
         ...messages,
       ],
     }),
@@ -280,20 +855,74 @@ async function callHemieLlm({ messages, context, fetchImpl = fetch, env = proces
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const detail =
-      payload?.error?.message || payload?.message || `LLM request failed with status ${response.status}`;
-    const error = new Error(detail);
-    error.status = response.status;
-    throw error;
+    throw createLlmError(
+      payload?.error?.message || payload?.message || `LLM request failed with status ${response.status}`,
+      response.status,
+    );
   }
 
   const reply = normalizeText(payload?.choices?.[0]?.message?.content);
-
   if (!reply) {
-    throw new Error('LLM returned an empty reply.');
+    throw createLlmError('LLM returned an empty reply.', 502);
   }
 
   return reply;
+}
+
+function shouldTryNextModel(error) {
+  const status = Number(error?.status);
+  if (status === 404 || status === 429 || status === 503) {
+    return true;
+  }
+
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    message.includes('quota') ||
+    message.includes('rate limit') ||
+    message.includes('not found') ||
+    message.includes('no longer available') ||
+    message.includes('high demand') ||
+    message.includes('does not exist') ||
+    message.includes('unsupported') ||
+    message.includes('empty reply')
+  );
+}
+
+async function callHemieLlm({ messages, context, fetchImpl = fetch, env = process.env }) {
+  const { apiKey, baseUrl, models, provider } = getLlmConfig(env);
+  let lastError = null;
+
+  for (const model of models) {
+    try {
+      if (provider === 'gemini') {
+        return await callGeminiNative({
+          messages,
+          context,
+          model,
+          apiKey,
+          fetchImpl,
+        });
+      }
+
+      return await callOpenAiCompat({
+        messages,
+        context,
+        model,
+        apiKey,
+        baseUrl,
+        fetchImpl,
+      });
+    } catch (error) {
+      lastError = error;
+      console.error(`Hemie LLM model failed (${model}):`, error?.message || error);
+
+      if (!shouldTryNextModel(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError || createLlmError('All Hemie LLM models failed.', 502);
 }
 
 async function generateHemieReply({
@@ -303,36 +932,38 @@ async function generateHemieReply({
   env = process.env,
 }) {
   const latestUserMessage = messages[messages.length - 1]?.content || '';
+  const grounded = getGroundedHemieReply(latestUserMessage, context);
+  const llmConfigured = isLlmConfigured(env);
 
-  if (EMERGENCY_PATTERN.test(latestUserMessage)) {
-    return {
-      reply: getLocalHemieReply(latestUserMessage, context),
-      source: 'safety',
-    };
+  // Without an LLM, return English local/safety replies as-is.
+  // With an LLM, pass safety/guardrail through so the model can reply in the user's language.
+  if ((grounded?.kind === 'safety' || grounded?.kind === 'guardrail') && !llmConfigured) {
+    return { reply: grounded.reply, source: grounded.kind };
   }
 
-  if (OFF_TOPIC_PATTERN.test(latestUserMessage)) {
+  if (!llmConfigured) {
     return {
       reply: getLocalHemieReply(latestUserMessage, context),
-      source: 'guardrail',
-    };
-  }
-
-  if (!isLlmConfigured(env)) {
-    return {
-      reply: getLocalHemieReply(latestUserMessage, context),
-      source: 'local',
+      source: grounded?.kind === 'grounded' ? 'grounded' : 'local',
     };
   }
 
   try {
     const reply = await callHemieLlm({ messages, context, fetchImpl, env });
-    return { reply, source: 'llm' };
+    return {
+      reply,
+      source:
+        grounded?.kind === 'safety'
+          ? 'safety'
+          : grounded?.kind === 'guardrail'
+            ? 'guardrail'
+            : 'llm',
+    };
   } catch (error) {
     console.error('Hemie LLM failed, using local fallback:', error);
     return {
       reply: getLocalHemieReply(latestUserMessage, context),
-      source: 'local_fallback',
+      source: grounded?.kind === 'grounded' ? 'grounded_fallback' : 'local_fallback',
     };
   }
 }
@@ -372,8 +1003,12 @@ async function verifySupabaseAccessToken(token, { fetchImpl = fetch, env = proce
 
 module.exports = {
   HEMIE_SYSTEM_PROMPT,
+  DONATION_INTERVAL_DAYS,
+  callHemieLlm,
   generateHemieReply,
   getLocalHemieReply,
+  getGroundedHemieReply,
+  getLlmConfig,
   isLlmConfigured,
   sanitizeContext,
   sanitizeMessages,

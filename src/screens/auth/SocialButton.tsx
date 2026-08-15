@@ -3,21 +3,33 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 import { colors } from '@/constants/theme';
 
 type SocialButtonProps = {
+  disabled?: boolean;
   icon: React.ReactNode;
+  loading?: boolean;
   title: string;
   onPress?: () => void;
 };
 
-export function SocialButton({ icon, title, onPress }: SocialButtonProps) {
+export function SocialButton({ disabled, icon, loading, title, onPress }: SocialButtonProps) {
+  const label = loading
+    ? `Connecting to ${title.replace(/^Continue with /i, '')}…`
+    : title;
+
   return (
     <Pressable
-      accessibilityLabel={title}
+      accessibilityLabel={label}
       accessibilityRole="button"
-      style={({ pressed }) => [styles.button, pressed ? styles.buttonPressed : null]}
+      accessibilityState={{ busy: Boolean(loading), disabled: Boolean(disabled || loading) }}
+      disabled={disabled || loading}
+      style={({ pressed }) => [
+        styles.button,
+        pressed && !disabled && !loading ? styles.buttonPressed : null,
+        disabled || loading ? styles.buttonDisabled : null,
+      ]}
       onPress={onPress}
     >
       {icon}
-      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.title}>{label}</Text>
     </Pressable>
   );
 }
@@ -34,6 +46,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 56,
     width: '100%',
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   buttonPressed: {
     opacity: 0.92,

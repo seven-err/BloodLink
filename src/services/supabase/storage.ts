@@ -87,9 +87,6 @@ class MemoryStorage implements StorageBackend {
 
 const createNativeBackend = (): StorageBackend => {
   const asyncAvailable = isAsyncStorageAvailable();
-  // #region agent log
-  fetch('http://127.0.0.1:7339/ingest/d0a42159-10ce-4cb5-8254-487dc7a5b01d',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'58c18a'},body:JSON.stringify({sessionId:'58c18a',runId:'post-fix',hypothesisId:'H1',location:'storage.ts:createNativeBackend',message:'native storage backend selection',data:{platform:Platform.OS,asyncAvailable,backend:asyncAvailable?'LargeSecureStore':'MemoryStorage'},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (!asyncAvailable) {
     if (__DEV__) {
       console.warn(
@@ -116,9 +113,6 @@ const getNativeBackend = () => {
 export const ExpoSecureStoreAdapter = {
   getItem: (key: string) => {
     if (Platform.OS === 'web') {
-      // #region agent log
-      fetch('http://127.0.0.1:7339/ingest/d0a42159-10ce-4cb5-8254-487dc7a5b01d',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'58c18a'},body:JSON.stringify({sessionId:'58c18a',runId:'post-fix',hypothesisId:'H4',location:'storage.ts:getItem',message:'web storage path used',data:{platform:Platform.OS,hasLocalStorage:typeof globalThis.localStorage!=='undefined'},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       return Promise.resolve(globalThis.localStorage?.getItem(key) ?? null);
     }
 
