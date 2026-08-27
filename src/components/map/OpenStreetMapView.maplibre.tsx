@@ -22,7 +22,7 @@ import type {
   OpenStreetMapViewProps,
 } from '@/components/map/types';
 import { mapStyles } from '@/components/map/styles';
-import { colors, radii } from '@/constants/theme';
+import { colors } from '@/constants/theme';
 import {
   getMapAttribution,
   getMapLibreStyle,
@@ -138,8 +138,9 @@ export const OpenStreetMapView = forwardRef<OpenStreetMapViewHandle, OpenStreetM
 
           {markers.map((marker) => {
             const isSelected = selectedMarkerId === marker.id;
-            const pinColor =
-              marker.pinColor ?? (isSelected ? colors.primaryDark : colors.primary);
+            const pinColor = isSelected
+              ? (marker.selectedPinColor ?? colors.primaryDark)
+              : (marker.pinColor ?? colors.primary);
 
             return (
               <Marker
@@ -148,15 +149,42 @@ export const OpenStreetMapView = forwardRef<OpenStreetMapViewHandle, OpenStreetM
                 lngLat={[marker.coordinates.longitude, marker.coordinates.latitude]}
                 onPress={() => onMarkerPress?.(marker.id)}
               >
-                <View
-                  style={[
-                    styles.markerDot,
-                    {
-                      backgroundColor: pinColor,
-                      transform: [{ scale: isSelected ? 1.25 : 1 }],
-                    },
-                  ]}
-                />
+                <View style={styles.markerContainer}>
+                  {isSelected ? (
+                    <View style={styles.popupBubble}>
+                      <View style={styles.popupHeader}>
+                        {marker.bloodType ? (
+                          <View style={styles.popupBloodPill}>
+                            <Text style={styles.popupBloodText}>{marker.bloodType}</Text>
+                          </View>
+                        ) : null}
+                        <Text numberOfLines={1} style={styles.popupTitle}>
+                          {marker.title}
+                        </Text>
+                      </View>
+                      {marker.description ? (
+                        <Text numberOfLines={1} style={styles.popupDescription}>
+                          {marker.description}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+
+                  <View
+                    style={[
+                      styles.markerBadge,
+                      {
+                        backgroundColor: pinColor,
+                        transform: [{ scale: isSelected ? 1.22 : 1 }],
+                      },
+                    ]}
+                  >
+                    <Text style={styles.markerBadgeText}>
+                      {marker.bloodType ? marker.bloodType : (marker.title || '')}
+                    </Text>
+                  </View>
+                  <View style={[styles.pinTail, { borderTopColor: pinColor }]} />
+                </View>
               </Marker>
             );
           })}
@@ -182,11 +210,83 @@ const styles = StyleSheet.create({
   mapFill: {
     ...StyleSheet.absoluteFill,
   },
-  markerDot: {
-    borderColor: colors.card,
-    borderRadius: radii.pill,
+  markerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerBadge: {
+    alignItems: 'center',
+    borderColor: '#ffffff',
+    borderRadius: 12,
     borderWidth: 2,
-    height: 16,
-    width: 16,
+    elevation: 4,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  markerBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 14,
+  },
+  pinTail: {
+    borderLeftColor: 'transparent',
+    borderLeftWidth: 5,
+    borderRightColor: 'transparent',
+    borderRightWidth: 5,
+    borderTopColor: colors.primary,
+    borderTopWidth: 5,
+    height: 0,
+    marginTop: -1,
+    width: 0,
+  },
+  popupBubble: {
+    backgroundColor: '#ffffff',
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    borderRadius: 12,
+    borderWidth: 1,
+    elevation: 6,
+    marginBottom: 6,
+    maxWidth: 220,
+    minWidth: 130,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+  popupHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  popupBloodPill: {
+    backgroundColor: colors.primary,
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  popupBloodText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  popupTitle: {
+    color: '#0f172a',
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  popupDescription: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
   },
 });

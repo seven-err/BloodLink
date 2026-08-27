@@ -1,14 +1,18 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { Bell, Clock, Droplet, Users } from 'lucide-react-native';
-import { Pressable, RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
+import {
+  Bell,
+  ChevronRight,
+  Clock,
+  Droplets,
+  MapPin,
+} from 'lucide-react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BloodTypeBadge } from '@/components/bloodRequest/BloodTypeBadge';
-import { DonorStatCard } from '@/components/donor/DonorStatCard';
 import { UrgentRequestCard } from '@/components/donor/UrgentRequestCard';
 import { ModeToggle } from '@/components/common/ModeToggle';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
@@ -20,27 +24,26 @@ import { useAuth } from '@/context/AuthContext';
 import type { AppTabParamList } from '@/navigation/AppTabNavigator';
 import type { AppStackParamList } from '@/navigation/types';
 import { donorHomeStyles } from '@/screens/donor/donorHomeStyles';
-import { listDonorVerifiableItems } from '@/services/supabase/donations';
 import { listNotifications } from '@/services/supabase/notifications';
 import {
   getOpenBloodRequestsFeed,
   type OpenBloodRequestFeedItem,
 } from '@/services/supabase/openBloodRequestsFeed';
 import {
-  isDonorVerificationActive,
-  setDonorAvailability,
-} from '@/services/supabase/profiles';
+  subscribeToOpenBloodRequests,
+  subscribeToUserNotifications,
+  unsubscribe,
+} from '@/services/supabase/realtime';
 import {
   getNearbyMapDonors,
   type NearbyMapDonorItem,
 } from '@/services/supabase/nearbyMapDonors';
-import { canDonorEnableAvailability } from '@/utils/donorAvailability';
-import { getBloodTypeCompatibilityLabel } from '@/utils/bloodTypeCompatibility';
 import { haversineDistanceMeters } from '@/utils/coordinates';
-import { countDonationsThisYear, getDaysUntilNextEligible } from '@/utils/donorDonationStats';
 import { formatRelativeTime } from '@/utils/relativeTime';
 import { formatLastDonationLabel } from '@/utils/donorMapDisplay';
 import { sanitizeProfileError } from '@/utils/profileErrors';
+
+import { appCache } from '@/utils/appCache';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<AppTabParamList, 'Home'>,
@@ -75,16 +78,18 @@ function DonorHomeSkeleton({ topInset }: { topInset: number }) {
     <View style={donorHomeStyles.screen}>
       <View style={[donorHomeStyles.header, { paddingTop: topInset + 8 }]}>
         <View style={donorHomeStyles.headerRow}>
-          <View style={{ flex: 1, gap: 8 }}>
-            <Skeleton height={28} width="70%" />
-            <Skeleton height={16} width="40%" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+            <Skeleton borderRadius={999} height={42} width={42} />
+            <View style={{ flex: 1, gap: 4 }}>
+              <Skeleton height={20} width="60%" />
+              <Skeleton height={14} width="35%" />
+            </View>
           </View>
           <Skeleton borderRadius={999} height={40} width={40} />
         </View>
-        <Skeleton borderRadius={999} height={42} style={donorHomeStyles.modeToggleRow} width="100%" />
+        <Skeleton borderRadius={999} height={44} style={donorHomeStyles.modeToggleRow} width="100%" />
       </View>
       <View style={[donorHomeStyles.scrollContent, { paddingTop: 24 }]}>
-        <Skeleton borderRadius={16} height={76} width="100%" />
         <Skeleton borderRadius={16} height={120} width="100%" />
         <View style={donorHomeStyles.statRow}>
           <Skeleton borderRadius={16} height={120} style={{ flex: 1 }} />
@@ -100,25 +105,26 @@ function DonorHomeSkeleton({ topInset }: { topInset: number }) {
 
 export function DonorHomeScreen({ navigation }: Props) {
   const { top: topInset } = useSafeAreaInsets();
-  const { profile, refreshProfile, session } = useAuth();
-  const [initialLoading, setInitialLoading] = useState(true);
-  const hasLoadedOnceRef = useRef(false);
-  const [requests, setRequests] = useState<OpenBloodRequestFeedItem[]>([]);
-  const [totalDonations, setTotalDonations] = useState(0);
-  const [donationsThisYear, setDonationsThisYear] = useState(0);
-  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
-  const [verificationActive, setVerificationActive] = useState(false);
-  const [availabilityLoading, setAvailabilityLoading] = useState(false);
-  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const { profile, session } = useAuth();
+  const cachedRequests = appCache.getSync<OpenBloodRequestFeedItem[]>('feed:open_requests');
+  const cachedNearby = appCache.getSync<NearbyMapDonorItem[]>('feed:nearby_donors');
+  const cachedUnread = session?.user.id
+    ? appCache.getSync<boolean>(`notifications:unread:${session.user.id}`)
+    : false;
+
+  const [initialLoading, setInitialLoading] = useState(
+    () => !cachedRequests && !cachedNearby,
+  );
+  const hasLoadedOnceRef = useRef(Boolean(cachedRequests || cachedNearby));
+  const [requests, setRequests] = useState<OpenBloodRequestFeedItem[]>(() => cachedRequests ?? []);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(
+    () => cachedUnread ?? false,
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [availabilityOverride, setAvailabilityOverride] = useState<boolean | null>(null);
-  const [nearbyDonors, setNearbyDonors] = useState<NearbyMapDonorItem[]>([]);
+  const [nearbyDonors, setNearbyDonors] = useState<NearbyMapDonorItem[]>(() => cachedNearby ?? []);
 
   const firstName = getFirstName(profile?.full_name);
-  const canEnableAvailability = canDonorEnableAvailability(profile, verificationActive);
-  const isAvailable = availabilityOverride ?? profile?.is_available ?? false;
-  const daysUntilEligible = getDaysUntilNextEligible(profile?.last_donation_at);
 
   const urgentRequests = useMemo(() => {
     const donorCoordinates =
@@ -174,7 +180,7 @@ export function DonorHomeScreen({ navigation }: Props) {
 
     if (isRefresh) {
       setRefreshing(true);
-    } else if (!hasLoadedOnceRef.current) {
+    } else if (!hasLoadedOnceRef.current && !appCache.getSync('feed:open_requests')) {
       setInitialLoading(true);
     }
 
@@ -183,34 +189,23 @@ export function DonorHomeScreen({ navigation }: Props) {
     try {
       const [
         requestsResult,
-        donationsResult,
         notificationsResult,
-        verificationResult,
       ] = await Promise.all([
         getOpenBloodRequestsFeed(),
-        listDonorVerifiableItems(session.user.id),
         listNotifications(),
-        isDonorVerificationActive(session.user.id),
       ]);
 
       if (requestsResult.error) {
         throw requestsResult.error;
       }
 
-      if (donationsResult.error) {
-        throw donationsResult.error;
-      }
-
       if (notificationsResult.error) {
         throw notificationsResult.error;
       }
 
-      if (verificationResult.error) {
-        throw verificationResult.error;
-      }
-
-      setRequests(requestsResult.data ?? []);
-      setVerificationActive(Boolean(verificationResult.data));
+      const freshRequests = requestsResult.data ?? [];
+      setRequests(freshRequests);
+      appCache.setSync('feed:open_requests', freshRequests);
 
       if (profile?.latitude != null && profile?.longitude != null) {
         const donorsResult = await getNearbyMapDonors({
@@ -220,25 +215,17 @@ export function DonorHomeScreen({ navigation }: Props) {
           maxResults: 3,
         });
         if (!donorsResult.error) {
-          setNearbyDonors(donorsResult.data ?? []);
+          const freshDonors = donorsResult.data ?? [];
+          setNearbyDonors(freshDonors);
+          appCache.setSync('feed:nearby_donors', freshDonors);
         }
       }
 
-      const completedDonations = (donationsResult.data ?? []).filter(
-        (item) => item.donationStatus === 'completed' || item.matchStatus === 'completed',
+      const unread = (notificationsResult.data ?? []).some(
+        (notification) => notification.read_at === null,
       );
-      setTotalDonations(completedDonations.length);
-      setDonationsThisYear(
-        countDonationsThisYear(
-          completedDonations
-            .map((item) => item.completedAt ?? item.createdAt)
-            .filter((value): value is string => Boolean(value)),
-        ),
-      );
-
-      setHasUnreadNotifications(
-        (notificationsResult.data ?? []).some((notification) => notification.read_at === null),
-      );
+      setHasUnreadNotifications(unread);
+      appCache.setSync(`notifications:unread:${session.user.id}`, unread);
     } catch (error) {
       setLoadError(sanitizeProfileError(error, 'Unable to load donor home data.'));
     } finally {
@@ -248,47 +235,36 @@ export function DonorHomeScreen({ navigation }: Props) {
     }
   }, [session?.user.id, profile?.latitude, profile?.longitude]);
 
+  useEffect(() => {
+    if (!session?.user.id) return;
+
+    const requestSub = subscribeToOpenBloodRequests((feed) => {
+      setRequests(feed);
+      setInitialLoading(false);
+    });
+
+    const notifChannel = subscribeToUserNotifications(session.user.id, () => {
+      void loadHomeData(false);
+    });
+
+    return () => {
+      requestSub.stop();
+      unsubscribe(notifChannel);
+    };
+  }, [session?.user.id, loadHomeData]);
+
   useFocusEffect(
     useCallback(() => {
       void loadHomeData();
     }, [loadHomeData]),
   );
 
-  const handleAvailabilityToggle = async (nextValue: boolean) => {
-    if (!session?.user.id || availabilityLoading) {
-      return;
-    }
-
-    if (nextValue && !canEnableAvailability) {
-      setAvailabilityError(
-        'Complete your donor profile (blood type, birthdate, and weight) before turning on availability.',
-      );
-      setAvailabilityOverride(null);
-      return;
-    }
-
-    setAvailabilityLoading(true);
-    setAvailabilityError(null);
-    setAvailabilityOverride(nextValue);
-
-    try {
-      const { error: updateError } = await setDonorAvailability(session.user.id, nextValue);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      await refreshProfile();
-      setAvailabilityOverride(null);
-    } catch (toggleError) {
-      setAvailabilityOverride(null);
-      setAvailabilityError(
-        sanitizeProfileError(toggleError, 'Unable to update availability. Please try again.'),
-      );
-    } finally {
-      setAvailabilityLoading(false);
-    }
-  };
+  const userInitials = (profile?.full_name || 'Donor')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((chunk) => chunk[0]?.toUpperCase())
+    .join('') || 'D';
 
   if (initialLoading && !hasLoadedOnceRef.current) {
     return <DonorHomeSkeleton topInset={topInset} />;
@@ -298,11 +274,22 @@ export function DonorHomeScreen({ navigation }: Props) {
     <View style={donorHomeStyles.screen}>
       <View style={[donorHomeStyles.header, { paddingTop: topInset + 8 }]}>
         <View style={donorHomeStyles.headerRow}>
-          <View>
-            <Text style={donorHomeStyles.greeting}>
-              {firstName ? `Hello, ${firstName}` : 'Hello'}
-            </Text>
-            <Text style={donorHomeStyles.roleLabel}>Donor</Text>
+          <View style={donorHomeStyles.headerUserRow}>
+            <View style={donorHomeStyles.avatarBox}>
+              <Text style={donorHomeStyles.avatarText}>{userInitials}</Text>
+            </View>
+            <View style={{ gap: 2 }}>
+              <Text style={donorHomeStyles.userNameText}>
+                {profile?.full_name || (firstName ? `Hello, ${firstName}` : 'Donor')}
+              </Text>
+              {profile?.blood_type ? (
+                <View style={donorHomeStyles.userBloodBadge}>
+                  <Text style={donorHomeStyles.userBloodBadgeText}>{profile.blood_type} Donor</Text>
+                </View>
+              ) : (
+                <Text style={donorHomeStyles.roleLabel}>Donor</Text>
+              )}
+            </View>
           </View>
           <Pressable
             accessibilityLabel="Open notifications"
@@ -315,7 +302,7 @@ export function DonorHomeScreen({ navigation }: Props) {
           </Pressable>
         </View>
         <View style={donorHomeStyles.modeToggleRow}>
-          <ModeToggle showHint />
+          <ModeToggle showHint={false} />
         </View>
       </View>
 
@@ -325,36 +312,6 @@ export function DonorHomeScreen({ navigation }: Props) {
           <RefreshControl refreshing={refreshing} onRefresh={() => void loadHomeData(true)} />
         }
       >
-        <View style={donorHomeStyles.availabilityCard}>
-          <View style={donorHomeStyles.availabilityIcon}>
-            <Droplet color={colors.mutedLight} size={22} />
-          </View>
-          <View style={donorHomeStyles.availabilityCopy}>
-            <Text style={donorHomeStyles.availabilityTitle}>Donation Availability</Text>
-            <Text style={donorHomeStyles.availabilityStatus}>
-              {isAvailable ? 'Available' : 'Unavailable'}
-            </Text>
-          </View>
-          <Switch
-            accessibilityLabel="Donation availability"
-            accessibilityState={{ checked: isAvailable, disabled: availabilityLoading }}
-            disabled={availabilityLoading}
-            thumbColor={colors.primaryForeground}
-            trackColor={{ false: colors.border, true: colors.primary }}
-            value={isAvailable}
-            onValueChange={(value) => {
-              void handleAvailabilityToggle(value);
-            }}
-          />
-        </View>
-        {!canEnableAvailability && !isAvailable ? (
-          <Text style={donorHomeStyles.availabilityHint}>
-            Complete your donor profile to enable donation availability.
-          </Text>
-        ) : null}
-        {availabilityError ? (
-          <Text style={donorHomeStyles.availabilityError}>{availabilityError}</Text>
-        ) : null}
         {loadError ? (
           <View style={donorHomeStyles.loadErrorCard}>
             <Text style={donorHomeStyles.availabilityError}>{loadError}</Text>
@@ -362,56 +319,73 @@ export function DonorHomeScreen({ navigation }: Props) {
           </View>
         ) : null}
 
-        {profile?.blood_type ? (
-          <View style={donorHomeStyles.bloodTypeCard}>
-            <Text style={donorHomeStyles.bloodTypeLabel}>Your Blood Type</Text>
-            <View style={donorHomeStyles.bloodTypeRow}>
-              <BloodTypeBadge bloodType={profile.blood_type} size="lg" />
-              <View style={{ flex: 1, gap: 4 }}>
-                <Text style={donorHomeStyles.bloodTypeLabel}>Compatible with</Text>
-                <Text style={donorHomeStyles.bloodTypeMeta}>
-                  {getBloodTypeCompatibilityLabel(profile.blood_type)}
-                </Text>
-              </View>
+        {/* 4-Feature Quick Action Bar */}
+        <View style={donorHomeStyles.quickFeatureGrid}>
+          <Pressable
+            accessibilityLabel="View blood requests"
+            accessibilityRole="button"
+            style={donorHomeStyles.quickFeatureCol}
+            onPress={() => navigation.navigate('Requests')}
+          >
+            <View style={[donorHomeStyles.quickFeatureBtn, { backgroundColor: '#fee2e2' }]}>
+              <Droplets color={colors.primary} size={24} />
+              {urgentRequests.length > 0 ? (
+                <View style={donorHomeStyles.quickFeatureBadge}>
+                  <Text style={donorHomeStyles.quickFeatureBadgeText}>{urgentRequests.length}</Text>
+                </View>
+              ) : null}
             </View>
-            <View style={donorHomeStyles.bloodTypeFooter}>
-              <View />
-              <Pressable
-                accessibilityLabel="View profile details"
-                accessibilityRole="button"
-                onPress={() => navigation.navigate('AppProfile')}
-              >
-                <Text style={donorHomeStyles.linkText}>View Details</Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : null}
+            <Text style={donorHomeStyles.quickFeatureLabel}>Requests</Text>
+          </Pressable>
 
-        <View style={donorHomeStyles.statRow}>
-          <DonorStatCard
-            icon={<Users color={colors.primary} size={20} />}
-            label="Total Donations"
-            subtext={donationsThisYear > 0 ? `+${donationsThisYear} this year` : 'No donations yet'}
-            subtextColor={donationsThisYear > 0 ? colors.success : colors.mutedLight}
-            value={String(totalDonations)}
-          />
-          <DonorStatCard
-            icon={<Clock color={colors.primary} size={20} />}
-            label="Next Eligible"
-            subtext="days remaining"
-            value={daysUntilEligible == null ? '—' : String(daysUntilEligible)}
-          />
+
+
+          <Pressable
+            accessibilityLabel="View nearby map"
+            accessibilityRole="button"
+            style={donorHomeStyles.quickFeatureCol}
+            onPress={() => navigation.navigate('Map')}
+          >
+            <View style={[donorHomeStyles.quickFeatureBtn, { backgroundColor: '#e0f2fe' }]}>
+              <MapPin color="#0284c7" size={24} />
+            </View>
+            <Text style={donorHomeStyles.quickFeatureLabel}>Map</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityLabel="View donation history"
+            accessibilityRole="button"
+            style={donorHomeStyles.quickFeatureCol}
+            onPress={() => navigation.getParent()?.navigate('MyDonations')}
+          >
+            <View style={[donorHomeStyles.quickFeatureBtn, { backgroundColor: '#fef3c7' }]}>
+              <Clock color="#d97706" size={24} />
+            </View>
+            <Text style={donorHomeStyles.quickFeatureLabel}>History</Text>
+          </Pressable>
         </View>
 
+
+
+
+
         <View style={donorHomeStyles.sectionHeader}>
-          <Text style={donorHomeStyles.sectionTitle}>Urgent Requests Nearby</Text>
+          <View style={donorHomeStyles.sectionTitleRow}>
+            <Text style={donorHomeStyles.sectionTitle}>Urgent Requests</Text>
+            {urgentRequests.length > 0 ? (
+              <View style={donorHomeStyles.countBadge}>
+                <Text style={donorHomeStyles.countBadgeText}>{urgentRequests.length}</Text>
+              </View>
+            ) : null}
+          </View>
           <Pressable
             accessibilityLabel="View all blood requests"
             accessibilityRole="button"
             style={donorHomeStyles.viewAllButton}
             onPress={() => navigation.navigate('Requests')}
           >
-            <Text style={donorHomeStyles.linkText}>View All</Text>
+            <Text style={donorHomeStyles.linkText}>All ({requests.length})</Text>
+            <ChevronRight color={colors.primary} size={14} />
           </Pressable>
         </View>
 
@@ -429,9 +403,21 @@ export function DonorHomeScreen({ navigation }: Props) {
                 key={request.id}
                 bloodType={request.blood_type}
                 distanceLabel={request.distanceLabel}
+                hospitalName={request.hospital_name || request.title}
                 timeLabel={request.timeLabel}
-                title={request.title}
+                title={request.hospital_name || request.title}
+                unitsNeeded={request.units_needed}
                 urgency={request.urgency}
+                onCall={() =>
+                  navigation
+                    .getParent()
+                    ?.navigate('DonorRequestDetail', { requestId: request.id })
+                }
+                onChat={() =>
+                  navigation
+                    .getParent()
+                    ?.navigate('DonorRequestDetail', { requestId: request.id })
+                }
                 onDetails={() =>
                   navigation
                     .getParent()
@@ -456,6 +442,7 @@ export function DonorHomeScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('Map')}
           >
             <Text style={donorHomeStyles.linkText}>View Map</Text>
+            <ChevronRight color={colors.primary} size={14} />
           </Pressable>
         </View>
 

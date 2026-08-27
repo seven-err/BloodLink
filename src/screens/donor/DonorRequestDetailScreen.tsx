@@ -1,7 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ArrowLeft } from 'lucide-react-native';
 
 import { BloodTypeBadge } from '@/components/bloodRequest/BloodTypeBadge';
 import { ContentLoadingSkeleton } from '@/components/common/ContentLoadingSkeleton';
@@ -9,8 +11,7 @@ import { SafetyReminderCard } from '@/components/bloodRequest/SafetyReminderCard
 import { UrgencyBadge } from '@/components/bloodRequest/UrgencyBadge';
 import { RequestLocationMapPreview } from '@/components/map/RequestLocationMapPreview';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
-import { colors } from '@/constants/theme';
-import { URGENCY_LABELS } from '@/constants/bloodRequestUrgency';
+import { colors, fontFamilies } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import type { AppStackParamList } from '@/navigation/types';
 import { authStyles } from '@/screens/auth/styles';
@@ -29,7 +30,11 @@ import {
   getOpenBloodRequestById,
   type OpenBloodRequestFeedItem,
 } from '@/services/supabase/openBloodRequestsFeed';
-import { formatExactCoordinates } from '@/utils/coordinates';
+import {
+  subscribeToDonorMatches,
+  subscribeToRequestMatches,
+  unsubscribe,
+} from '@/services/supabase/realtime';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'DonorRequestDetail'>;
 
@@ -72,46 +77,24 @@ const toFeedPreview = (
   updated_at: details.updated_at,
 });
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DetailRow({
+  label,
+  value,
+  isLast = false,
+}: {
+  label: string;
+  value: string;
+  isLast?: boolean;
+}) {
   return (
-    <View style={{ gap: 4 }}>
+    <View style={{ gap: 4, marginBottom: isLast ? 0 : 4 }}>
       <Text style={recipientStyles.detailLabel}>{label}</Text>
       <Text style={recipientStyles.detailValue}>{value}</Text>
     </View>
   );
 }
 
-function RequestHeroCard({
-  bloodType,
-  unitsNeeded,
-  urgency,
-}: {
-  bloodType: string;
-  unitsNeeded: number;
-  urgency: OpenBloodRequestFeedItem['urgency'];
-}) {
-  return (
-    <View style={recipientStyles.card}>
-      <Text style={recipientStyles.eyebrow}>Request preview</Text>
-      <View style={recipientStyles.cardHeaderRow}>
-        <View style={{ flex: 1, gap: 6 }}>
-          <Text style={recipientStyles.title}>
-            {bloodType} · {unitsNeeded} unit{unitsNeeded === 1 ? '' : 's'}
-          </Text>
-          <View style={recipientStyles.heroBadgeRow}>
-            <BloodTypeBadge bloodType={bloodType} size="lg" />
-            <UrgencyBadge urgency={urgency} />
-          </View>
-        </View>
-      </View>
-      <View style={recipientStyles.infoBanner}>
-        <Text style={recipientStyles.infoBannerText}>
-          Patient and contact details are hidden until your match is accepted.
-        </Text>
-      </View>
-    </View>
-  );
-}
+
 
 function ResponseStatusCard({
   hasExistingMatch,
@@ -174,43 +157,66 @@ function ResponseStatusCard({
 
 function SensitiveDetailsCard({ details }: { details: MatchedBloodRequestDetails }) {
   return (
-    <View style={recipientStyles.card}>
-      <Text style={recipientStyles.eyebrow}>Matched request details</Text>
-      <Text style={recipientStyles.subtitle}>
-        Your match was accepted. Use these details to coordinate donation.
-      </Text>
-      <DetailRow label="Patient" value={details.patient_name?.trim() || 'Not provided'} />
-      <DetailRow label="Hospital" value={details.hospital_name} />
-      <DetailRow label="Contact phone" value={details.contact_phone?.trim() || 'Not provided'} />
-      <DetailRow label="Address" value={details.address?.trim() || 'Not provided'} />
-      {details.notes?.trim() ? <DetailRow label="Notes" value={details.notes.trim()} /> : null}
+    <View style={recipientStyles.sectionWrapper}>
+      <Text style={recipientStyles.sectionTitle}>Patient Details</Text>
+      <View style={recipientStyles.card}>
+        <View style={{ gap: 4, marginBottom: 16 }}>
+          <Text style={recipientStyles.subtitle}>
+            Your match was accepted. Use these details to coordinate donation.
+          </Text>
+        </View>
+        <View style={recipientStyles.detailGrid}>
+          <DetailRow label="Patient" value={details.patient_name?.trim() || 'Not provided'} />
+          <DetailRow label="Hospital" value={details.hospital_name} />
+          <DetailRow label="Contact phone" value={details.contact_phone?.trim() || 'Not provided'} />
+          <DetailRow label="Address" value={details.address?.trim() || 'Not provided'} />
+          {details.notes?.trim() ? <DetailRow label="Notes" value={details.notes.trim()} /> : null}
+        </View>
+      </View>
     </View>
   );
 }
 
+import { appCache } from '@/utils/appCache';
+
 export function DonorRequestDetailScreen({ navigation, route }: Props) {
+  const { top: topInset } = useSafeAreaInsets();
   const { requestId } = route.params;
   const { session, profile } = useAuth();
   const donorId = session?.user.id;
 
-  const [request, setRequest] = useState<OpenBloodRequestFeedItem | null>(null);
-  const [existingMatch, setExistingMatch] = useState<DonorMatch | null>(null);
-  const [matchedDetails, setMatchedDetails] = useState<MatchedBloodRequestDetails | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedDetail = appCache.getSync<OpenBloodRequestFeedItem>(`request:detail:${requestId}`);
+  const cachedFromFeed = !cachedDetail
+    ? (appCache.getSync<OpenBloodRequestFeedItem[]>('feed:open_requests') ?? []).find(
+        (r) => r.id === requestId,
+      )
+    : undefined;
+  const initialRequest = cachedDetail ?? cachedFromFeed ?? null;
+
+  const [request, setRequest] = useState<OpenBloodRequestFeedItem | null>(() => initialRequest);
+  const [existingMatch, setExistingMatch] = useState<DonorMatch | null>(
+    () => donorId ? appCache.getSync<DonorMatch>(`donor_match:${requestId}:${donorId}`) ?? null : null,
+  );
+  const [matchedDetails, setMatchedDetails] = useState<MatchedBloodRequestDetails | null>(
+    () => appCache.getSync<MatchedBloodRequestDetails>(`request:matched_details:${requestId}`) ?? null,
+  );
+  const [loading, setLoading] = useState(() => !initialRequest);
   const [error, setError] = useState<string | null>(null);
   const [responseState, setResponseState] = useState<ResponseUiState>('idle');
   const [responseError, setResponseError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const [openingChat, setOpeningChat] = useState(false);
 
-  const loadRequest = useCallback(async () => {
+  const loadRequest = useCallback(async (isSilent = false) => {
     if (!donorId) {
       setError('You must be signed in as a donor to view this request.');
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (!isSilent && !appCache.getSync(`request:detail:${requestId}`) && !initialRequest) {
+      setLoading(true);
+    }
     setError(null);
 
     const [
@@ -223,25 +229,32 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
 
     if (feedError) {
       setError(feedError.message);
-      setRequest(null);
-      setExistingMatch(null);
-      setMatchedDetails(null);
+      if (!initialRequest) {
+        setRequest(null);
+        setExistingMatch(null);
+        setMatchedDetails(null);
+      }
       setLoading(false);
       return;
     }
 
     if (matchError) {
       setError(matchError.message);
-      setRequest(null);
-      setExistingMatch(null);
-      setMatchedDetails(null);
+      if (!initialRequest) {
+        setRequest(null);
+        setExistingMatch(null);
+        setMatchedDetails(null);
+      }
       setLoading(false);
       return;
     }
 
     setExistingMatch(donorMatch);
+    if (donorMatch) {
+      appCache.setSync(`donor_match:${requestId}:${donorId}`, donorMatch);
+    }
 
-    if (!feedItem && !donorMatch) {
+    if (!feedItem && !donorMatch && !initialRequest) {
       setError('This request is no longer open or you do not have access.');
       setRequest(null);
       setMatchedDetails(null);
@@ -249,7 +262,7 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
       return;
     }
 
-    let nextRequest: OpenBloodRequestFeedItem | null = feedItem;
+    let nextRequest: OpenBloodRequestFeedItem | null = feedItem ?? initialRequest;
     let nextMatchedDetails: MatchedBloodRequestDetails | null = null;
 
     if (donorMatch && canShowSensitiveRequestDetails(donorMatch)) {
@@ -260,20 +273,41 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
         setMatchedDetails(null);
       } else if (authorizedDetails) {
         nextMatchedDetails = authorizedDetails;
+        appCache.setSync(`request:matched_details:${requestId}`, authorizedDetails);
         if (!nextRequest) {
           nextRequest = toFeedPreview(authorizedDetails);
         }
       }
     }
 
-    setRequest(nextRequest);
+    if (nextRequest) {
+      setRequest(nextRequest);
+      appCache.setSync(`request:detail:${requestId}`, nextRequest);
+    }
     setMatchedDetails(nextMatchedDetails);
     setLoading(false);
-  }, [donorId, requestId]);
+  }, [donorId, initialRequest, requestId]);
+
+  useEffect(() => {
+    if (!donorId) return;
+
+    const matchChannel = subscribeToDonorMatches(donorId, () => {
+      void loadRequest(true);
+    });
+
+    const requestSub = subscribeToRequestMatches(requestId, () => {
+      void loadRequest(true);
+    });
+
+    return () => {
+      unsubscribe(matchChannel);
+      requestSub.stop();
+    };
+  }, [donorId, requestId, loadRequest]);
 
   useFocusEffect(
     useCallback(() => {
-      void loadRequest();
+      void loadRequest(true);
     }, [loadRequest]),
   );
 
@@ -440,39 +474,87 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={recipientStyles.scrollContent}
-      style={recipientStyles.screen}
-    >
-      <RequestHeroCard
-        bloodType={request.blood_type}
-        unitsNeeded={request.units_needed}
-        urgency={request.urgency}
-      />
-
-      <View style={recipientStyles.card}>
-        <Text style={recipientStyles.eyebrow}>Request information</Text>
-        <View style={recipientStyles.detailGrid}>
-          <DetailRow label="Urgency" value={URGENCY_LABELS[request.urgency]} />
-          <DetailRow label="Units needed" value={String(request.units_needed)} />
-          <DetailRow label="Blood type" value={request.blood_type} />
-          <DetailRow label="Needed by" value={formatDateTime(request.needed_at)} />
-          <DetailRow
-            label="Hospital"
-            value={request.hospital_name?.trim() || 'Not provided'}
-          />
-          <DetailRow
-            label="Address"
-            value={request.address?.trim() || 'Not provided'}
-          />
-          <DetailRow
-            label="Coordinates"
-            value={formatExactCoordinates(request.latitude, request.longitude)}
-          />
-          <DetailRow label="Posted" value={formatDateTime(request.created_at)} />
-          <DetailRow label="Last updated" value={formatDateTime(request.updated_at)} />
-        </View>
+    <>
+      {/* Inline header with back button */}
+      <View
+        style={{
+          alignItems: 'center',
+          backgroundColor: colors.card,
+          borderBottomColor: colors.border,
+          borderBottomWidth: 1,
+          flexDirection: 'row',
+          gap: 12,
+          paddingBottom: 14,
+          paddingHorizontal: 20,
+          paddingTop: topInset + 8,
+        }}
+      >
+        <Pressable
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={() => navigation.goBack()}
+        >
+          <ArrowLeft color={colors.foreground} size={22} />
+        </Pressable>
+        <Text
+          style={{
+            color: colors.foreground,
+            flex: 1,
+            fontSize: 18,
+            fontWeight: '800',
+          }}
+        >
+          Request Preview
+        </Text>
       </View>
+
+      <ScrollView
+        contentContainerStyle={recipientStyles.scrollContent}
+        style={recipientStyles.screen}
+      >
+        <View style={recipientStyles.sectionWrapper}>
+          <Text style={recipientStyles.sectionTitle}>Request Details</Text>
+          <View style={recipientStyles.card}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 }}>
+                {/* Blood Box */}
+                <BloodTypeBadge bloodType={request.blood_type} />
+
+                {/* Hospital & Meta */}
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text numberOfLines={1} style={{ color: '#0F172A', fontFamily: fontFamilies.textBold, fontSize: 13.5, fontWeight: '700' }}>
+                    {request.hospital_name?.trim() || 'Hospital not provided'}
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ color: '#64748B', fontFamily: fontFamilies.textSemibold, fontSize: 11, fontWeight: '600' }}>
+                      {request.units_needed} {request.units_needed === 1 ? 'Unit' : 'Units'} Needed
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Urgency Tag */}
+              <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                <UrgencyBadge urgency={request.urgency} />
+              </View>
+            </View>
+
+            <View style={recipientStyles.infoBanner}>
+              <Text style={recipientStyles.infoBannerText}>
+                Patient and contact details are hidden until your match is accepted.
+              </Text>
+            </View>
+
+            <View style={recipientStyles.detailGrid}>
+              <DetailRow label="Needed By" value={formatDateTime(request.needed_at)} />
+              {request.address?.trim() ? (
+                <DetailRow label="Address" value={request.address.trim()} />
+              ) : null}
+              <DetailRow label="Posted" value={formatDateTime(request.created_at)} isLast />
+            </View>
+          </View>
+        </View>
 
       <RequestLocationMapPreview
         latitude={request.latitude}
@@ -527,6 +609,7 @@ export function DonorRequestDetailScreen({ navigation, route }: Props) {
         variant="secondary"
         onPress={() => navigation.navigate('AppTabs', { screen: 'Requests' })}
       />
-    </ScrollView>
+      </ScrollView>
+    </>
   );
 }

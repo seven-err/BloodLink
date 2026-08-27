@@ -10,6 +10,7 @@ import { MyDonationsScreen } from '@/screens/donor/MyDonationsScreen';
 import { NearbyDonorDetailScreen } from '@/screens/donor/NearbyDonorDetailScreen';
 import { HemieAIScreen } from '@/screens/hemie/HemieAIScreen';
 import { EditProfileScreen } from '@/screens/profile/EditProfileScreen';
+import { ProfileQrScreen } from '@/screens/profile/ProfileQrScreen';
 import { AccountSettingsScreen } from '@/screens/profile/AccountSettingsScreen';
 import { ProfilePictureScreen } from '@/screens/profile/ProfilePictureScreen';
 import { SettingsDetailScreen } from '@/screens/profile/SettingsDetailScreen';
@@ -80,22 +81,27 @@ export function AppNavigator() {
       <Stack.Screen
         component={DonorRequestDetailScreen}
         name="DonorRequestDetail"
-        options={{ title: 'Request Preview' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         component={MyDonationsScreen}
         name="MyDonations"
-        options={{ title: 'My Donations' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         component={DonationQrScreen}
         name="DonationQr"
-        options={{ title: 'Donation QR' }}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        component={ProfileQrScreen}
+        name="ProfileQr"
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         component={MyBloodRequestsScreen}
         name="MyBloodRequests"
-        options={{ title: 'My Blood Requests' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         component={CreateBloodRequestScreen}
@@ -105,7 +111,7 @@ export function AppNavigator() {
       <Stack.Screen
         component={BloodRequestDetailScreen}
         name="BloodRequestDetail"
-        options={{ title: 'Request Details' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         component={ChatThreadScreen}

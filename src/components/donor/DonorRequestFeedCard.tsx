@@ -1,4 +1,4 @@
-import { Clock, MapPin } from 'lucide-react-native';
+import { ChevronRight, Clock, HeartHandshake, MapPin, MessageCircle, Phone } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BloodTypeBadge } from '@/components/bloodRequest/BloodTypeBadge';
@@ -11,6 +11,9 @@ type DonorRequestFeedCardProps = {
   bloodType: string;
   compatible: boolean;
   distanceLabel: string;
+  onCall?: () => void;
+  onChat?: () => void;
+  onRespond?: () => void;
   onViewDetails: () => void;
   subtitle: string;
   timeLabel: string;
@@ -27,6 +30,9 @@ export function DonorRequestFeedCard({
   bloodType,
   compatible,
   distanceLabel,
+  onCall,
+  onChat,
+  onRespond,
   onViewDetails,
   subtitle,
   timeLabel,
@@ -34,6 +40,8 @@ export function DonorRequestFeedCard({
   unitsNeeded,
   urgency,
 }: DonorRequestFeedCardProps) {
+  const handlePrimaryPress = onRespond ?? onViewDetails;
+
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
@@ -65,18 +73,57 @@ export function DonorRequestFeedCard({
         {unitsNeeded} unit{unitsNeeded === 1 ? '' : 's'} needed
       </Text>
 
-      <Pressable
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.detailsButton, pressed ? styles.buttonPressed : null]}
-        onPress={onViewDetails}
-      >
-        <Text style={styles.detailsText}>View Details</Text>
-      </Pressable>
+      <View style={styles.actions}>
+        <Pressable
+          accessibilityLabel="Donate to blood request"
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.primaryButton, pressed ? styles.buttonPressed : null]}
+          onPress={handlePrimaryPress}
+        >
+          <HeartHandshake color={colors.primaryForeground} size={16} strokeWidth={2.25} />
+          <Text style={styles.primaryButtonText}>Donate</Text>
+        </Pressable>
+        {onCall ? (
+          <Pressable
+            accessibilityLabel="Call hospital"
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.iconButton, pressed ? styles.buttonPressed : null]}
+            onPress={onCall}
+          >
+            <Phone color="#0F172A" size={16} strokeWidth={2.25} />
+          </Pressable>
+        ) : null}
+        {onChat ? (
+          <Pressable
+            accessibilityLabel="Chat with requester"
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.iconButton, pressed ? styles.buttonPressed : null]}
+            onPress={onChat}
+          >
+            <MessageCircle color="#0F172A" size={16} strokeWidth={2.25} />
+          </Pressable>
+        ) : null}
+        <Pressable
+          accessibilityLabel="View request details"
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.detailsButton, pressed ? styles.buttonPressed : null]}
+          onPress={onViewDetails}
+        >
+          <Text style={styles.detailsText}>Details</Text>
+          <ChevronRight color={colors.foreground} size={16} strokeWidth={2.25} />
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  actions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
   badgeRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -84,28 +131,39 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   buttonPressed: {
-    opacity: 0.92,
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
+  },
+  iconButton: {
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
   },
   card: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 12,
     padding: 16,
     ...shadows.card,
   },
   detailsButton: {
     alignItems: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.card,
+    borderColor: colors.border,
     borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 4,
     justifyContent: 'center',
-    minHeight: 48,
-    paddingHorizontal: 16,
+    minHeight: 44,
+    paddingHorizontal: 14,
   },
   detailsText: {
-    color: colors.primaryForeground,
-    fontSize: 15,
+    color: colors.foreground,
+    fontSize: 14,
     fontWeight: '700',
   },
   headerCopy: {
@@ -128,6 +186,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
   },
+  primaryButton: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 14,
+  },
+  primaryButtonText: {
+    color: colors.primaryForeground,
+    fontSize: 15,
+    fontWeight: '700',
+  },
   subtitle: {
     color: colors.mutedLight,
     fontSize: 14,
@@ -144,3 +218,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+

@@ -18,8 +18,8 @@ export const recipientStyles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.card,
-    borderRadius: radii.cardLg,
-    gap: 10,
+    borderRadius: radii.card,
+    gap: 12,
     padding: 20,
     ...shadows.card,
   },
@@ -32,7 +32,7 @@ export const recipientStyles = StyleSheet.create({
   donorName: {
     color: colors.foreground,
     flexShrink: 1,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
   },
   donorTitleRow: {
@@ -68,55 +68,140 @@ export const recipientStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  // Detail screen
+  detailSection: {
+    gap: 12,
+  },
+  detailSectionTitle: {
+    color: colors.foreground,
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
   detailGrid: {
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
-    gap: 14,
-    paddingTop: 14,
+    gap: 0,
+  },
+  detailRow: {
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    alignItems: 'flex-start',
+  },
+  detailRowLast: {
+    borderBottomWidth: 0,
   },
   detailLabel: {
     color: colors.muted,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
   },
   detailValue: {
     color: colors.foreground,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 2,
+    textAlign: 'right',
   },
-  emptyCard: {
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderColor: colors.border,
+  // Hero card (detail screen top)
+  heroCard: {
+    backgroundColor: colors.primary,
     borderRadius: radii.card,
-    borderWidth: 1,
-    gap: 8,
+    gap: 14,
     padding: 20,
     ...shadows.card,
   },
-  emptyText: {
-    color: colors.mutedLight,
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: 'center',
-  },
-  eyebrow: {
-    color: colors.primaryDark,
-    fontSize: 13,
+  heroCardTitle: {
+    color: colors.primaryForeground,
+    fontSize: 20,
     fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+  },
+  heroCardSubtitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 14,
+    lineHeight: 20,
   },
   heroBadgeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
+  // Donor response card
+  donorResponseCard: {
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    gap: 10,
+    padding: 16,
+    ...shadows.card,
+  },
+  donorResponseMeta: {
+    color: colors.mutedLight,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  donorResponseMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+  },
+  donorResponseMetaChip: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  donorResponseMetaChipText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  donorResponseActions: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingTop: 4,
+  },
+  // Empty / error
+  emptyCard: {
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    gap: 12,
+    padding: 28,
+    ...shadows.card,
+  },
+  emptyIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.primarySoft,
+    borderRadius: 99,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
+  },
+  emptyText: {
+    color: colors.mutedLight,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  eyebrow: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
   infoBanner: {
     backgroundColor: colors.infoSoft,
-    borderColor: colors.infoSoft,
+    borderColor: colors.border,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 4,
@@ -129,16 +214,14 @@ export const recipientStyles = StyleSheet.create({
   },
   listCard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 8,
     padding: 16,
     ...shadows.card,
   },
   listContent: {
     gap: 12,
-    padding: 24,
+    padding: 20,
     paddingBottom: 40,
   },
   meta: {
@@ -166,7 +249,7 @@ export const recipientStyles = StyleSheet.create({
   },
   pillSelected: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    borderColor: colors.border,
   },
   pillText: {
     color: colors.foreground,
@@ -179,7 +262,7 @@ export const recipientStyles = StyleSheet.create({
   requestTitle: {
     color: colors.foreground,
     flex: 1,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
   },
   screen: {
@@ -188,23 +271,32 @@ export const recipientStyles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    gap: 12,
-    padding: 24,
+    gap: 16,
+    padding: 20,
     paddingBottom: 40,
   },
   sectionIntro: {
     gap: 6,
   },
+  sectionWrapper: {
+    gap: 12,
+  },
+  sectionTitle: {
+    color: colors.foreground,
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
   subtitle: {
     color: colors.mutedLight,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 14,
+    lineHeight: 21,
   },
   successText: {
     color: colors.success,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    lineHeight: 22,
+    lineHeight: 21,
   },
   tabHeader: {
     alignItems: 'center',
@@ -225,16 +317,16 @@ export const recipientStyles = StyleSheet.create({
   },
   title: {
     color: colors.foreground,
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
   },
   urgencyPillCritical: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    borderColor: colors.border,
   },
   urgencyPillNormal: {
     backgroundColor: colors.infoSoft,
-    borderColor: colors.info,
+    borderColor: colors.border,
   },
   urgencyPillTextCritical: {
     color: colors.primaryForeground,
@@ -247,6 +339,71 @@ export const recipientStyles = StyleSheet.create({
   },
   urgencyPillUrgent: {
     backgroundColor: colors.orangeSoft,
-    borderColor: colors.warning,
+    borderColor: colors.border,
+  },
+  // Filter chips (horizontal scroll)
+  filterChipsRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    paddingBottom: 6,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  filterChip: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    height: 38,
+    paddingHorizontal: 14,
+  },
+  filterChipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  filterChipText: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  filterChipTextSelected: {
+    color: colors.primaryForeground,
+    fontWeight: '700',
+  },
+  // Stats strip
+  statsStrip: {
+    flexDirection: 'row',
+    gap: 0,
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    overflow: 'hidden',
+    ...shadows.card,
+  },
+  statItem: {
+    alignItems: 'center',
+    borderRightColor: colors.border,
+    borderRightWidth: 1,
+    flex: 1,
+    gap: 2,
+    paddingVertical: 14,
+  },
+  statItemLast: {
+    borderRightWidth: 0,
+  },
+  statValue: {
+    color: colors.foreground,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  statLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

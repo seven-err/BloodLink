@@ -1,15 +1,17 @@
-import { MapPin } from 'lucide-react-native';
+import { MapPin, Navigation } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BloodTypeBadge } from '@/components/bloodRequest/BloodTypeBadge';
 import { DonorVerificationBadge } from '@/components/donor/DonorVerificationBadge';
 import { colors, radii, shadows } from '@/constants/theme';
 import type { NearbyMapDonorItem } from '@/services/supabase/nearbyMapDonors';
+import { resolveDonorVerificationDisplay } from '@/utils/donorVerificationDisplay';
 import { formatLastDonationLabel } from '@/utils/donorMapDisplay';
 
 type NearbyDonorCardProps = {
   donor: NearbyMapDonorItem;
   onPress: () => void;
+  onDirections?: () => void;
   selected?: boolean;
 };
 
@@ -27,8 +29,15 @@ const getInitials = (fullName: string) => {
   return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
 };
 
-export function NearbyDonorCard({ donor, onPress, selected = false }: NearbyDonorCardProps) {
-  const verificationStatus = donor.isVerified ? 'verified' : 'pending';
+export function NearbyDonorCard({
+  donor,
+  onPress,
+  onDirections,
+  selected = false,
+}: NearbyDonorCardProps) {
+  const verificationStatus = resolveDonorVerificationDisplay({
+    verificationActive: donor.isVerified,
+  });
 
   return (
     <Pressable
@@ -86,6 +95,25 @@ export function NearbyDonorCard({ donor, onPress, selected = false }: NearbyDono
       </View>
 
       <Text style={styles.lastDonation}>{formatLastDonationLabel(donor.lastDonationAt)}</Text>
+
+      {onDirections ? (
+        <View style={styles.actionRow}>
+          <Pressable
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.directionsBtn,
+              pressed ? styles.directionsBtnPressed : null,
+            ]}
+            onPress={(e) => {
+              e.stopPropagation();
+              onDirections();
+            }}
+          >
+            <Navigation color={colors.primary} size={15} strokeWidth={2.25} />
+            <Text style={styles.directionsBtnText}>Get directions</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -137,9 +165,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 12,
     padding: 16,
     ...shadows.card,
@@ -148,7 +174,7 @@ const styles = StyleSheet.create({
     opacity: 0.96,
   },
   cardSelected: {
-    borderColor: colors.primary,
+    backgroundColor: '#f8fafc',
   },
   lastDonation: {
     color: colors.muted,
@@ -201,6 +227,29 @@ const styles = StyleSheet.create({
   unavailableText: {
     color: colors.muted,
     fontSize: 12,
+    fontWeight: '700',
+  },
+  actionRow: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    paddingTop: 10,
+    marginTop: 4,
+  },
+  directionsBtn: {
+    alignItems: 'center',
+    backgroundColor: colors.primarySoft,
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  directionsBtnPressed: {
+    opacity: 0.85,
+  },
+  directionsBtnText: {
+    color: colors.primary,
+    fontSize: 14,
     fontWeight: '700',
   },
 });

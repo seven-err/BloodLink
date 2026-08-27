@@ -1,9 +1,9 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Filter, Map, Search } from 'lucide-react-native';
+import { Check, Filter, Flame, Map, Search } from 'lucide-react-native';
 import {
   Pressable,
   RefreshControl,
@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DonorRequestFeedCard } from '@/components/donor/DonorRequestFeedCard';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { Skeleton } from '@/components/common/Skeleton';
+import { HemieFloatingButton } from '@/components/hemie/HemieFloatingButton';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import type { AppTabParamList } from '@/navigation/AppTabNavigator';
@@ -26,9 +27,12 @@ import {
   getOpenBloodRequestsFeed,
   type OpenBloodRequestFeedItem,
 } from '@/services/supabase/openBloodRequestsFeed';
+import { subscribeToOpenBloodRequests } from '@/services/supabase/realtime';
 import { isDonorCompatibleWithRecipient } from '@/utils/bloodTypeCompatibility';
 import { haversineDistanceMeters } from '@/utils/coordinates';
 import { formatRelativeTime } from '@/utils/relativeTime';
+
+import { appCache } from '@/utils/appCache';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<AppTabParamList, 'Requests'>,
@@ -43,11 +47,11 @@ const URGENCY_PRIORITY = {
   normal: 2,
 } as const;
 
-const FILTER_CHIPS: { id: RequestFilter; label: string }[] = [
+const FILTER_CHIPS: { id: RequestFilter; label: string; icon?: typeof Flame }[] = [
   { id: 'all', label: 'All' },
-  { id: 'critical', label: 'Critical' },
+  { id: 'critical', label: 'Critical', icon: Flame },
   { id: 'high', label: 'High' },
-  { id: 'compatible', label: 'Compatible' },
+  { id: 'compatible', label: 'Compatible', icon: Check },
 ];
 
 const getRequestDisplayTitle = (request: OpenBloodRequestFeedItem) => {
@@ -131,8 +135,9 @@ function DonorRequestFeedSkeleton({ topInset }: { topInset: number }) {
 export function DonorRequestFeedScreen({ navigation }: Props) {
   const { top: topInset } = useSafeAreaInsets();
   const { profile } = useAuth();
-  const [requests, setRequests] = useState<OpenBloodRequestFeedItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cachedRequests = appCache.getSync<OpenBloodRequestFeedItem[]>('feed:open_requests');
+  const [requests, setRequests] = useState<OpenBloodRequestFeedItem[]>(() => cachedRequests ?? []);
+  const [loading, setLoading] = useState(() => !cachedRequests);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -157,7 +162,7 @@ export function DonorRequestFeedScreen({ navigation }: Props) {
   const loadRequests = useCallback(async (isRefresh = false, isSilent = false) => {
     if (isRefresh) {
       setRefreshing(true);
-    } else if (!isSilent) {
+    } else if (!isSilent && !appCache.getSync('feed:open_requests')) {
       setLoading(true);
     }
 
@@ -167,21 +172,34 @@ export function DonorRequestFeedScreen({ navigation }: Props) {
 
     if (fetchError) {
       setError(fetchError.message);
-      if (!isSilent) {
+      if (!isSilent && !appCache.getSync('feed:open_requests')) {
         setRequests([]);
       }
     } else {
-      setRequests(data ?? []);
+      const fresh = data ?? [];
+      setRequests(fresh);
+      appCache.setSync('feed:open_requests', fresh);
     }
 
     setLoading(false);
     setRefreshing(false);
   }, []);
 
+  useEffect(() => {
+    const subscription = subscribeToOpenBloodRequests((feed) => {
+      setRequests(feed);
+      appCache.setSync('feed:open_requests', feed);
+      setLoading(false);
+    });
+
+    return () => {
+      subscription.stop();
+    };
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      // The first time it runs, `loading` is already true. 
-      // For subsequent focuses, we do a silent fetch to update data without a loading skeleton.
+      // For focus, we do a silent fetch to ensure up-to-date data
       void loadRequests(false, true);
     }, [loadRequests]),
   );
@@ -339,6 +357,7 @@ export function DonorRequestFeedScreen({ navigation }: Props) {
           >
             {FILTER_CHIPS.map((chip) => {
               const isActive = activeFilter === chip.id;
+              const ChipIcon = chip.icon;
 
               return (
                 <Pressable
@@ -351,6 +370,12 @@ export function DonorRequestFeedScreen({ navigation }: Props) {
                   ]}
                   onPress={() => setActiveFilter(chip.id)}
                 >
+                  {ChipIcon ? (
+                    <ChipIcon
+                      color={isActive ? colors.primaryForeground : colors.muted}
+                      size={14}
+                    />
+                  ) : null}
                   <Text
                     style={[
                       donorRequestFeedStyles.chipLabel,
@@ -402,6 +427,8 @@ export function DonorRequestFeedScreen({ navigation }: Props) {
           ))
         )}
       </ScrollView>
+
+      <HemieFloatingButton onPress={() => navigation.getParent()?.navigate('HemieAI')} />
     </View>
   );
 }

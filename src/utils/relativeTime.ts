@@ -16,18 +16,24 @@ export const formatRelativeTime = (value: string | null | undefined): string => 
   }
 
   if (diffMinutes < 60) {
-    return `${diffMinutes} min${diffMinutes === 1 ? '' : 's'} ago`;
+    return `${diffMinutes}m`;
   }
 
   const diffHours = Math.floor(diffMinutes / 60);
   if (diffHours < 24) {
-    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+    return `${diffHours}h`;
   }
 
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) {
-    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+    return `${diffDays}d`;
   }
 
-  return date.toLocaleDateString();
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffDays < 365) {
+    return `${diffWeeks}w`;
+  }
+
+  const diffYears = Math.floor(diffDays / 365);
+  return `${diffYears}${diffYears === 1 ? 'yr' : 'yrs'}`;
 };

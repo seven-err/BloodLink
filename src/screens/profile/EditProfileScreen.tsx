@@ -35,6 +35,7 @@ import { MAX_DONOR_WEIGHT_KG, MIN_DONOR_WEIGHT_KG } from '@/utils/donorEligibili
 import { formatGeocodedAddress } from '@/utils/locationAddress';
 import { formatRoleLabel } from '@/utils/profileDisplay';
 import { sanitizeProfileError } from '@/utils/profileErrors';
+import { appCache } from '@/utils/appCache';
 import { editProfileStyles } from './editProfileStyles';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'EditProfile'>;
@@ -242,6 +243,7 @@ export function EditProfileScreen({ navigation }: Props) {
         throw updateError;
       }
 
+      appCache.invalidate(`profile:dashboard:${session.user.id}`);
       await refreshProfile();
       allowExit();
       navigation.goBack();

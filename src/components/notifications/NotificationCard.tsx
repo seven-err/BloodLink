@@ -69,7 +69,6 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 10,
     padding: 16,
     ...shadows.card,
@@ -79,11 +78,9 @@ const styles = StyleSheet.create({
   },
   cardPriority: {
     backgroundColor: colors.primaryTint,
-    borderColor: colors.borderAccent,
   },
   cardStandard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
   },
   cardUnread: {
     backgroundColor: colors.backgroundTint,

@@ -30,9 +30,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 12,
     padding: 20,
   },

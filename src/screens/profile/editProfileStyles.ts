@@ -10,8 +10,6 @@ export const editProfileStyles = StyleSheet.create({
   },
   footer: {
     backgroundColor: colors.card,
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
     gap: 12,
     paddingHorizontal: 24,
     paddingTop: 16,
@@ -19,8 +17,6 @@ export const editProfileStyles = StyleSheet.create({
   header: {
     alignItems: 'center',
     backgroundColor: colors.card,
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
     flexDirection: 'row',
     gap: 12,
     paddingBottom: 14,
@@ -43,10 +39,8 @@ export const editProfileStyles = StyleSheet.create({
   },
   roleBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.background,
-    borderColor: colors.border,
+    backgroundColor: '#f1f5f9',
     borderRadius: radii.pill,
-    borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
@@ -71,9 +65,7 @@ export const editProfileStyles = StyleSheet.create({
   },
   sectionCard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 16,
     padding: 16,
     ...shadows.card,
@@ -120,9 +112,7 @@ export const editProfileStyles = StyleSheet.create({
   },
   unavailableCard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 12,
     padding: 20,
     ...shadows.card,
@@ -153,9 +143,7 @@ export const editProfileStyles = StyleSheet.create({
   profilePictureAction: {
     alignItems: 'center',
     backgroundColor: colors.primaryTint,
-    borderColor: colors.borderAccent,
     borderRadius: 14,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: 10,
     justifyContent: 'center',
@@ -197,9 +185,7 @@ export const editProfileStyles = StyleSheet.create({
   },
   skeletonCard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 16,
     padding: 16,
     ...shadows.card,

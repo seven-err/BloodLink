@@ -28,6 +28,8 @@ import {
 } from '@/utils/notificationDisplay';
 import { parseNotificationData } from '@/utils/notificationData';
 
+import { appCache } from '@/utils/appCache';
+
 type Props = NativeStackScreenProps<AppStackParamList, 'Notifications'>;
 
 function NotificationsSkeleton({ topInset }: { topInset: number }) {
@@ -53,16 +55,21 @@ export function NotificationsScreen({ navigation }: Props) {
   const { top: topInset } = useSafeAreaInsets();
   const { profile, session } = useAuth();
   const userId = session?.user.id;
+  const cachedNotifications = userId
+    ? appCache.getSync<AppNotification[]>(`notifications:${userId}`)
+    : undefined;
 
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>(
+    () => cachedNotifications ?? [],
+  );
   const [activeFilter, setActiveFilter] = useState<NotificationFilter>('all');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => cachedNotifications === undefined);
   const [refreshing, setRefreshing] = useState(false);
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadNotifications = useCallback(
-    async (isRefresh = false) => {
+    async (isRefresh = false, isSilent = false) => {
       if (!userId) {
         setError('You must be signed in to view notifications.');
         setLoading(false);
@@ -72,7 +79,7 @@ export function NotificationsScreen({ navigation }: Props) {
 
       if (isRefresh) {
         setRefreshing(true);
-      } else {
+      } else if (!isSilent && !appCache.getSync(`notifications:${userId}`)) {
         setLoading(true);
       }
 
@@ -82,9 +89,13 @@ export function NotificationsScreen({ navigation }: Props) {
 
       if (loadError) {
         setError(loadError.message);
-        setNotifications([]);
+        if (!isSilent && !appCache.getSync(`notifications:${userId}`)) {
+          setNotifications([]);
+        }
       } else {
-        setNotifications(data ?? []);
+        const fresh = data ?? [];
+        setNotifications(fresh);
+        appCache.setSync(`notifications:${userId}`, fresh);
       }
 
       setLoading(false);
@@ -95,14 +106,14 @@ export function NotificationsScreen({ navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      void loadNotifications();
+      void loadNotifications(false, true);
 
       if (!userId) {
         return undefined;
       }
 
       const channel = subscribeToUserNotifications(userId, () => {
-        void loadNotifications(true);
+        void loadNotifications(true, true);
       });
 
       return () => {

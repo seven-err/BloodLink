@@ -24,9 +24,7 @@ export const nearbyDonorDetailStyles = StyleSheet.create({
   },
   heroCard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 16,
     padding: 20,
     ...shadows.card,
@@ -59,9 +57,7 @@ export const nearbyDonorDetailStyles = StyleSheet.create({
   },
   noticeCard: {
     backgroundColor: colors.infoSoft,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 8,
     padding: 16,
   },
@@ -114,9 +110,7 @@ export const nearbyDonorDetailStyles = StyleSheet.create({
   },
   statsCard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 16,
     padding: 20,
     ...shadows.card,

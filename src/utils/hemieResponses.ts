@@ -215,8 +215,8 @@ export const getHemieResponse = (question: string, context: HemieContext = {}): 
 
   if (AVAILABILITY_PATTERN.test(normalized)) {
     return locale === 'fil'
-      ? 'I-on ang Donation Availability sa donor Home screen kapag handa ka nang tumugon sa nearby requests. Panatilihing updated ang profile at verification para mas mabilis kang ma-match.'
-      : 'Turn on Donation Availability from your donor Home screen when you are ready to respond to nearby requests. Keep your profile and verification up to date so recipients can match with you faster.';
+      ? 'I-on ang Donation Availability sa iyong Profile tab katabi ng Edit Profile kapag handa ka nang tumugon sa nearby requests. Panatilihing updated ang profile at verification para mas mabilis kang ma-match.'
+      : 'Turn on Donation Availability from your Profile tab next to Edit Profile when you are ready to respond to nearby requests. Keep your profile and verification up to date so recipients can match with you faster.';
   }
 
   if (QR_PATTERN.test(normalized)) {

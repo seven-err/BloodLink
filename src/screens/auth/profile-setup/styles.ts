@@ -19,7 +19,8 @@ export const profileSetupStyles = StyleSheet.create({
     width: '22%',
   },
   bloodTypeButtonSelected: {
-    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.border,
   },
   bloodTypeText: {
     color: colors.foreground,
@@ -31,7 +32,7 @@ export const profileSetupStyles = StyleSheet.create({
   },
   callout: {
     backgroundColor: colors.infoSoft,
-    borderColor: colors.info,
+    borderColor: colors.border,
     borderRadius: 12,
     borderWidth: 1,
     gap: 8,
@@ -166,9 +167,7 @@ export const profileSetupStyles = StyleSheet.create({
   toggleCard: {
     alignItems: 'center',
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: 12,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
     padding: 16,

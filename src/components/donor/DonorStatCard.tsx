@@ -31,9 +31,7 @@ export function DonorStatCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     flex: 1,
     gap: 4,
     minWidth: '46%',

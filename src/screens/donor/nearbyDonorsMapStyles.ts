@@ -26,7 +26,7 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
   },
   chipActive: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    borderColor: colors.border,
   },
   chipLabel: {
     color: colors.foreground,
@@ -52,9 +52,7 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
   },
   detailCard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.cardLg,
-    borderWidth: 1,
     gap: 10,
     padding: 18,
     ...shadows.card,
@@ -139,9 +137,7 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
   },
   emptyCard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 12,
     padding: 20,
     ...shadows.card,
@@ -288,9 +284,7 @@ export const nearbyDonorsMapStyles = StyleSheet.create({
   },
   summaryCard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.cardLg,
-    borderWidth: 1,
     gap: 12,
     padding: 16,
     ...shadows.card,

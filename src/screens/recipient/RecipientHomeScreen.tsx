@@ -2,12 +2,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { AlertCircle, Bell, Clock, Plus, Users } from 'lucide-react-native';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { Activity, AlertCircle, Bell, Clock, MapPin, MessageCircle, Plus, Users } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BloodTypeBadge } from '@/components/bloodRequest/BloodTypeBadge';
 import { DonorStatCard } from '@/components/donor/DonorStatCard';
 import { NearbyDonorFeedCard } from '@/components/recipient/NearbyDonorFeedCard';
 import { ModeToggle } from '@/components/common/ModeToggle';
@@ -23,15 +22,19 @@ import { recipientHomeStyles } from '@/screens/recipient/recipientHomeStyles';
 import { getMyBloodRequests } from '@/services/supabase/bloodRequests';
 import { listNotifications } from '@/services/supabase/notifications';
 import {
+  subscribeToMyBloodRequests,
+  subscribeToUserNotifications,
+  unsubscribe,
+} from '@/services/supabase/realtime';
+import {
   getNearbyMapDonors,
   type NearbyMapDonorItem,
 } from '@/services/supabase/nearbyMapDonors';
-import {
-  getRecipientCanReceiveFromLabel,
-  isDonorCompatibleWithRecipient,
-} from '@/utils/bloodTypeCompatibility';
+import { isDonorCompatibleWithRecipient } from '@/utils/bloodTypeCompatibility';
 import { formatLastDonationLabel } from '@/utils/donorMapDisplay';
 import { sanitizeProfileError } from '@/utils/profileErrors';
+
+import { appCache } from '@/utils/appCache';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<AppTabParamList, 'Home'>,
@@ -88,13 +91,16 @@ function RecipientHomeSkeleton({ topInset }: { topInset: number }) {
     <View style={recipientHomeStyles.screen}>
       <View style={[recipientHomeStyles.header, { paddingTop: topInset + 8 }]}>
         <View style={recipientHomeStyles.headerRow}>
-          <View style={{ flex: 1, gap: 8 }}>
-            <Skeleton height={28} width="70%" />
-            <Skeleton height={16} width="40%" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+            <Skeleton borderRadius={999} height={42} width={42} />
+            <View style={{ flex: 1, gap: 4 }}>
+              <Skeleton height={20} width="60%" />
+              <Skeleton height={14} width="35%" />
+            </View>
           </View>
           <Skeleton borderRadius={999} height={40} width={40} />
         </View>
-        <Skeleton borderRadius={999} height={42} style={recipientHomeStyles.modeToggleRow} width="100%" />
+        <Skeleton borderRadius={999} height={44} style={recipientHomeStyles.modeToggleRow} width="100%" />
       </View>
       <View style={[recipientHomeStyles.scrollContent, { paddingTop: 24 }]}>
         <Skeleton borderRadius={16} height={160} width="100%" />
@@ -114,17 +120,35 @@ function RecipientHomeSkeleton({ topInset }: { topInset: number }) {
 export function RecipientHomeScreen({ navigation }: Props) {
   const { top: topInset } = useSafeAreaInsets();
   const { profile, session } = useAuth();
-  const [initialLoading, setInitialLoading] = useState(true);
-  const hasLoadedOnceRef = useRef(false);
-  const [activeRequestCount, setActiveRequestCount] = useState(0);
-  const [nearbyDonors, setNearbyDonors] = useState<NearbyMapDonorItem[]>([]);
-  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
+
+  const userId = session?.user.id;
+  const cachedCount = userId
+    ? appCache.getSync<number>(`recipient:active_request_count:${userId}`)
+    : undefined;
+  const cachedNearby = appCache.getSync<NearbyMapDonorItem[]>('recipient:nearby_donors');
+  const cachedUnread = userId
+    ? appCache.getSync<boolean>(`notifications:unread:${userId}`)
+    : false;
+
+  const [initialLoading, setInitialLoading] = useState(
+    () => cachedCount === undefined && !cachedNearby,
+  );
+  const hasLoadedOnceRef = useRef(cachedCount !== undefined || Boolean(cachedNearby));
+  const [activeRequestCount, setActiveRequestCount] = useState(() => cachedCount ?? 0);
+  const [nearbyDonors, setNearbyDonors] = useState<NearbyMapDonorItem[]>(() => cachedNearby ?? []);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(() => cachedUnread ?? false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const { coordinates: gpsCoordinates, requestLocation } = useForegroundLocation();
 
   const firstName = getFirstName(profile?.full_name);
+  const userInitials = (profile?.full_name || 'Recipient')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((chunk) => chunk[0]?.toUpperCase())
+    .join('') || 'R';
 
   const originCoordinates = useMemo(
     () => getOriginCoordinates(gpsCoordinates, profile?.latitude, profile?.longitude),
@@ -164,7 +188,7 @@ export function RecipientHomeScreen({ navigation }: Props) {
 
     if (isRefresh) {
       setRefreshing(true);
-    } else if (!hasLoadedOnceRef.current) {
+    } else if (!hasLoadedOnceRef.current && appCache.getSync(`recipient:active_request_count:${session.user.id}`) === undefined) {
       setInitialLoading(true);
     }
 
@@ -185,12 +209,14 @@ export function RecipientHomeScreen({ navigation }: Props) {
       }
 
       const requests = requestsResult.data ?? [];
-      setActiveRequestCount(
-        requests.filter((request) => ACTIVE_REQUEST_STATUSES.has(request.status)).length,
-      );
-      setHasUnreadNotifications(
-        (notificationsResult.data ?? []).some((notification) => notification.read_at === null),
-      );
+      const count = requests.filter((request) => ACTIVE_REQUEST_STATUSES.has(request.status)).length;
+      setActiveRequestCount(count);
+      appCache.setSync(`recipient:active_request_count:${session.user.id}`, count);
+      appCache.setSync(`recipient:my_requests:${session.user.id}`, requests);
+
+      const unread = (notificationsResult.data ?? []).some((notification) => notification.read_at === null);
+      setHasUnreadNotifications(unread);
+      appCache.setSync(`notifications:unread:${session.user.id}`, unread);
 
       if (originCoordinates) {
         const { data, error: donorsError } = await getNearbyMapDonors({
@@ -205,7 +231,9 @@ export function RecipientHomeScreen({ navigation }: Props) {
           throw donorsError;
         }
 
-        setNearbyDonors(data ?? []);
+        const freshDonors = data ?? [];
+        setNearbyDonors(freshDonors);
+        appCache.setSync('recipient:nearby_donors', freshDonors);
       } else {
         setNearbyDonors([]);
       }
@@ -217,6 +245,23 @@ export function RecipientHomeScreen({ navigation }: Props) {
       hasLoadedOnceRef.current = true;
     }
   }, [originCoordinates, session?.user.id]);
+
+  useEffect(() => {
+    if (!session?.user.id) return;
+
+    const requestSub = subscribeToMyBloodRequests(session.user.id, () => {
+      void loadHomeData(false);
+    });
+
+    const notifChannel = subscribeToUserNotifications(session.user.id, () => {
+      void loadHomeData(false);
+    });
+
+    return () => {
+      requestSub.stop();
+      unsubscribe(notifChannel);
+    };
+  }, [session?.user.id, loadHomeData]);
 
   useFocusEffect(
     useCallback(() => {
@@ -237,11 +282,22 @@ export function RecipientHomeScreen({ navigation }: Props) {
     <View style={recipientHomeStyles.screen}>
       <View style={[recipientHomeStyles.header, { paddingTop: topInset + 8 }]}>
         <View style={recipientHomeStyles.headerRow}>
-          <View>
-            <Text style={recipientHomeStyles.greeting}>
-              {firstName ? `Hello, ${firstName}` : 'Hello'}
-            </Text>
-            <Text style={recipientHomeStyles.roleLabel}>Recipient</Text>
+          <View style={recipientHomeStyles.headerUserRow}>
+            <View style={recipientHomeStyles.avatarBox}>
+              <Text style={recipientHomeStyles.avatarText}>{userInitials}</Text>
+            </View>
+            <View style={{ gap: 2 }}>
+              <Text style={recipientHomeStyles.userNameText}>
+                {profile?.full_name || (firstName ? `Hello, ${firstName}` : 'Recipient')}
+              </Text>
+              {profile?.blood_type ? (
+                <View style={recipientHomeStyles.userBloodBadge}>
+                  <Text style={recipientHomeStyles.userBloodBadgeText}>{profile.blood_type} Recipient</Text>
+                </View>
+              ) : (
+                <Text style={recipientHomeStyles.roleLabel}>Recipient</Text>
+              )}
+            </View>
           </View>
           <Pressable
             accessibilityLabel="Open notifications"
@@ -254,7 +310,7 @@ export function RecipientHomeScreen({ navigation }: Props) {
           </Pressable>
         </View>
         <View style={recipientHomeStyles.modeToggleRow}>
-          <ModeToggle showHint />
+          <ModeToggle showHint={false} />
         </View>
       </View>
 
@@ -269,7 +325,7 @@ export function RecipientHomeScreen({ navigation }: Props) {
             <View style={{ flex: 1, gap: 6 }}>
               <Text style={recipientHomeStyles.emergencyTitle}>Emergency Request</Text>
               <Text style={recipientHomeStyles.emergencySubtitle}>
-                Create a blood request instantly
+                Broadcast instant SOS to nearby donors
               </Text>
             </View>
             <AlertCircle color={colors.primaryForeground} size={24} />
@@ -288,30 +344,62 @@ export function RecipientHomeScreen({ navigation }: Props) {
           </Pressable>
         </View>
 
-        {profile?.blood_type ? (
-          <View style={recipientHomeStyles.bloodTypeCard}>
-            <Text style={recipientHomeStyles.bloodTypeLabel}>Your Blood Type</Text>
-            <View style={recipientHomeStyles.bloodTypeRow}>
-              <BloodTypeBadge bloodType={profile.blood_type} size="lg" />
-              <View style={{ flex: 1, gap: 4 }}>
-                <Text style={recipientHomeStyles.bloodTypeLabel}>Can receive from</Text>
-                <Text style={recipientHomeStyles.bloodTypeMeta}>
-                  {getRecipientCanReceiveFromLabel(profile.blood_type)}
-                </Text>
-              </View>
+        <View style={recipientHomeStyles.quickBar}>
+          <Pressable
+            accessibilityLabel="Create new request"
+            accessibilityRole="button"
+            style={recipientHomeStyles.quickItem}
+            onPress={() => navigation.getParent()?.navigate('CreateBloodRequest')}
+          >
+            <View style={[recipientHomeStyles.quickIconButton, { backgroundColor: colors.primarySoft }]}>
+              <Plus color={colors.primary} size={22} strokeWidth={2.5} />
             </View>
-            <View style={recipientHomeStyles.bloodTypeFooter}>
-              <View />
-              <Pressable
-                accessibilityLabel="View profile details"
-                accessibilityRole="button"
-                onPress={() => navigation.navigate('AppProfile')}
-              >
-                <Text style={recipientHomeStyles.linkText}>View Details</Text>
-              </Pressable>
+            <Text style={recipientHomeStyles.quickLabel}>New Request</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityLabel="View my requests"
+            accessibilityRole="button"
+            style={recipientHomeStyles.quickItem}
+            onPress={() => navigation.navigate('Requests')}
+          >
+            <View style={[recipientHomeStyles.quickIconButton, { backgroundColor: colors.infoSoft }]}>
+              <Activity color={colors.info} size={22} strokeWidth={2.25} />
+              {activeRequestCount > 0 ? (
+                <View style={recipientHomeStyles.quickBadge}>
+                  <Text style={recipientHomeStyles.quickBadgeText}>{activeRequestCount}</Text>
+                </View>
+              ) : null}
             </View>
-          </View>
-        ) : null}
+            <Text style={recipientHomeStyles.quickLabel}>My Requests</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityLabel="View donor map"
+            accessibilityRole="button"
+            style={recipientHomeStyles.quickItem}
+            onPress={() => navigation.navigate('Map')}
+          >
+            <View style={[recipientHomeStyles.quickIconButton, { backgroundColor: colors.successSoft }]}>
+              <MapPin color={colors.success} size={22} strokeWidth={2.25} />
+            </View>
+            <Text style={recipientHomeStyles.quickLabel}>Donor Map</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityLabel="View messages"
+            accessibilityRole="button"
+            style={recipientHomeStyles.quickItem}
+            onPress={() => navigation.navigate('Chat')}
+          >
+            <View style={[recipientHomeStyles.quickIconButton, { backgroundColor: colors.background }]}>
+              <MessageCircle color={colors.foreground} size={22} strokeWidth={2.25} />
+            </View>
+            <Text style={recipientHomeStyles.quickLabel}>Messages</Text>
+          </Pressable>
+        </View>
+
+
 
         <View style={recipientHomeStyles.statRow}>
           <DonorStatCard

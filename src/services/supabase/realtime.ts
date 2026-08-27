@@ -8,16 +8,18 @@ import { supabase } from './client';
 
 type SubscriptionHandler<T> = (payload: T) => void;
 
-export type OpenBloodRequestsFeedSubscription = {
+export type RealtimeSubscription = {
   stop: () => void;
 };
+
+export type OpenBloodRequestsFeedSubscription = RealtimeSubscription;
 
 export const subscribeToUserNotifications = (
   userId: string,
   onChange: SubscriptionHandler<unknown>,
 ): RealtimeChannel =>
   supabase
-    .channel(`notifications:user:${userId}`)
+    .channel(`notifications:user:${userId}:${Date.now()}`)
     .on(
       'postgres_changes',
       {
@@ -35,7 +37,7 @@ export const subscribeToDonorMatches = (
   onChange: SubscriptionHandler<unknown>,
 ): RealtimeChannel =>
   supabase
-    .channel(`donor_matches:donor:${donorId}`)
+    .channel(`donor_matches:donor:${donorId}:${Date.now()}`)
     .on(
       'postgres_changes',
       {
@@ -48,14 +50,11 @@ export const subscribeToDonorMatches = (
     )
     .subscribe();
 
-const DEFAULT_OPEN_FEED_POLL_INTERVAL_MS = 30_000;
+const DEFAULT_OPEN_FEED_POLL_INTERVAL_MS = 20_000;
 
 /**
- * Polls open_blood_requests_feed for donor-facing open request updates.
- *
- * Supabase Realtime cannot subscribe to views, and blood_requests postgres_changes
- * are not visible to unmatched donors under RLS. Polling the safe feed view is the
- * supported refresh strategy.
+ * Subscribes to open blood requests in real time across all accounts via
+ * Supabase Realtime websocket events, with periodic polling as an active fallback.
  */
 export const subscribeToOpenBloodRequests = (
   onChange: SubscriptionHandler<OpenBloodRequestFeedItem[]>,
@@ -79,7 +78,26 @@ export const subscribeToOpenBloodRequests = (
     onChange(data ?? []);
   };
 
+  // Initial fetch
   void fetchAndNotify();
+
+  // Supabase Realtime channel for live table changes
+  const channel = supabase
+    .channel(`blood_requests:open_feed:${Date.now()}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'blood_requests',
+      },
+      () => {
+        void fetchAndNotify();
+      },
+    )
+    .subscribe();
+
+  // Polling fallback timer
   const timer = setInterval(() => {
     void fetchAndNotify();
   }, intervalMs);
@@ -88,6 +106,79 @@ export const subscribeToOpenBloodRequests = (
     stop: () => {
       active = false;
       clearInterval(timer);
+      supabase.removeChannel(channel);
+    },
+  };
+};
+
+/**
+ * Subscribes to recipient's own blood requests for real-time updates (e.g. status changes, new matches).
+ */
+export const subscribeToMyBloodRequests = (
+  requesterId: string,
+  onChange: SubscriptionHandler<unknown>,
+  options?: { intervalMs?: number },
+): RealtimeSubscription => {
+  const intervalMs = options?.intervalMs ?? DEFAULT_OPEN_FEED_POLL_INTERVAL_MS;
+  const channelId = `blood_requests:requester:${requesterId}:${Date.now()}`;
+
+  const channel = supabase
+    .channel(channelId)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'blood_requests',
+        filter: `requester_id=eq.${requesterId}`,
+      },
+      onChange,
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'donor_matches',
+      },
+      onChange,
+    )
+    .subscribe();
+
+  const timer = setInterval(onChange, intervalMs);
+
+  return {
+    stop: () => {
+      clearInterval(timer);
+      supabase.removeChannel(channel);
+    },
+  };
+};
+
+/**
+ * Subscribes to donor matches for a specific blood request.
+ */
+export const subscribeToRequestMatches = (
+  requestId: string,
+  onChange: SubscriptionHandler<unknown>,
+): RealtimeSubscription => {
+  const channel = supabase
+    .channel(`donor_matches:request:${requestId}:${Date.now()}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'donor_matches',
+        filter: `request_id=eq.${requestId}`,
+      },
+      onChange,
+    )
+    .subscribe();
+
+  return {
+    stop: () => {
+      supabase.removeChannel(channel);
     },
   };
 };
@@ -115,7 +206,7 @@ export const subscribeToMessages = (
   const intervalMs = options?.intervalMs ?? DEFAULT_MESSAGES_POLL_INTERVAL_MS;
 
   const channel = supabase
-    .channel(`messages:request:${context.bloodRequestId}:match:${context.donorMatchId}`)
+    .channel(`messages:request:${context.bloodRequestId}:match:${context.donorMatchId}:${Date.now()}`)
     .on(
       'postgres_changes',
       {

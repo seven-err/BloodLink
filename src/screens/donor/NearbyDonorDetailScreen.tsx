@@ -12,10 +12,13 @@ import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import type { AppStackParamList } from '@/navigation/types';
 import { nearbyDonorDetailStyles } from '@/screens/donor/nearbyDonorDetailStyles';
-import { getMyBloodRequests } from '@/services/supabase/bloodRequests';
+import { getMyBloodRequests, type BloodRequest } from '@/services/supabase/bloodRequests';
 import { isDonorCompatibleWithRecipient } from '@/utils/bloodTypeCompatibility';
+import { resolveDonorVerificationDisplay } from '@/utils/donorVerificationDisplay';
 import { formatLastDonationLabel } from '@/utils/donorMapDisplay';
 import { formatDistance } from '@/utils/travelMetrics';
+import { openMapDirections } from '@/utils/mapDirections';
+import { appCache } from '@/utils/appCache';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'NearbyDonorDetail'>;
 
@@ -24,7 +27,9 @@ export function NearbyDonorDetailScreen({ navigation, route }: Props) {
   const { profile, session } = useAuth();
   const { donor } = route.params;
   const [coordinating, setCoordinating] = useState(false);
-  const verificationStatus = donor.isVerified ? 'verified' : 'pending';
+  const verificationStatus = resolveDonorVerificationDisplay({
+    verificationActive: donor.isVerified,
+  });
   const isRecipient = profile?.role === 'recipient';
   const isDonor = profile?.role === 'donor';
 
@@ -48,12 +53,17 @@ export function NearbyDonorDetailScreen({ navigation, route }: Props) {
 
     setCoordinating(true);
 
-    const { data: requests, error } = await getMyBloodRequests(session.user.id);
+    const cachedRequests = appCache.getSync<BloodRequest[]>(`recipient:my_requests:${session.user.id}`);
+    let requests: BloodRequest[] | undefined = cachedRequests;
 
-    if (error) {
-      Alert.alert('Unable to load requests', error.message);
-      setCoordinating(false);
-      return;
+    if (!requests) {
+      const { data, error } = await getMyBloodRequests(session.user.id);
+      if (error) {
+        Alert.alert('Unable to load requests', error.message);
+        setCoordinating(false);
+        return;
+      }
+      requests = data ?? [];
     }
 
     const openCompatibleRequests = (requests ?? []).filter(
@@ -178,6 +188,18 @@ export function NearbyDonorDetailScreen({ navigation, route }: Props) {
           <Text style={nearbyDonorDetailStyles.lastDonation}>
             {formatLastDonationLabel(donor.lastDonationAt)}
           </Text>
+
+          <PrimaryButton
+            title="Get directions to donor location"
+            variant="secondary"
+            onPress={() =>
+              openMapDirections({
+                latitude: donor.latitude,
+                longitude: donor.longitude,
+                label: donor.fullName,
+              })
+            }
+          />
         </View>
 
         <View style={nearbyDonorDetailStyles.noticeCard}>

@@ -25,6 +25,8 @@ import {
   type Profile,
 } from '@/services/supabase/profiles';
 import { sanitizeAuthError } from '@/utils/authErrors';
+import { appCache } from '@/utils/appCache';
+import { prefetchAppData } from '@/utils/prefetchAppData';
 import {
   clearAuthParamsFromBrowserUrl,
   isEmailConfirmationRedirect,
@@ -55,9 +57,11 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: PropsWithChildren) {
   const [initializing, setInitializing] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile>(null);
+  const [profile, setProfile] = useState<Profile>(() => appCache.getSync<Profile>('auth:profile') ?? null);
   const [bloodbankVerification, setBloodbankVerification] =
-    useState<BloodbankVerification | null>(null);
+    useState<BloodbankVerification | null>(
+      () => appCache.getSync<BloodbankVerification>('auth:bloodbank_verification') ?? null,
+    );
   const [authError, setAuthError] = useState<string | null>(null);
   const [authRetrying, setAuthRetrying] = useState(false);
   const [emailJustConfirmed, setEmailJustConfirmed] = useState(false);
@@ -82,10 +86,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
           setAuthError(null);
           setProfileLoading(false);
         });
+        appCache.invalidate('auth:');
         return;
       }
 
-      if (!options?.background) {
+      if (!options?.background && !appCache.getSync('auth:profile')) {
         applyProfileState(() => {
           setProfileLoading(true);
         });
@@ -130,6 +135,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
           setAuthError(null);
           setProfileLoading(false);
         });
+
+        if (resolvedProfile) {
+          appCache.setSync('auth:profile', resolvedProfile, 24 * 60 * 60 * 1000);
+        }
+        if (verification) {
+          appCache.setSync('auth:bloodbank_verification', verification, 24 * 60 * 60 * 1000);
+        }
+        if (resolvedProfile && activeSession?.user.id) {
+          void prefetchAppData(resolvedProfile, activeSession.user.id);
+        }
 
         if (resolvedProfile?.avatar_path) {
           void prefetchProfileAvatar(resolvedProfile.avatar_path);

@@ -35,6 +35,7 @@ export type AppStackParamList = {
   DonorRequestDetail: { requestId: string };
   MyDonations: undefined;
   DonationQr: { matchId: string; donationId?: string };
+  ProfileQr: undefined;
   MyBloodRequests: undefined;
   CreateBloodRequest: { bloodType?: BloodType } | undefined;
   BloodRequestDetail: { requestId: string };
