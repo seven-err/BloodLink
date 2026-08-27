@@ -103,6 +103,7 @@ export const OpenStreetMapView = forwardRef<OpenStreetMapViewHandle, OpenStreetM
             title: marker.title,
             description: marker.description,
             pinColor: marker.pinColor,
+            bloodType: marker.bloodType,
           })),
           selectedMarkerId,
           mapMode,

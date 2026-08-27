@@ -3,20 +3,20 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppErrorBoundary } from '@/components/common/AppErrorBoundary';
 import { hasRequiredEnv } from '@/config/env';
+import { useAppFonts } from '@/hooks/useAppFonts';
 import { useAutoUpdate } from '@/hooks/useAutoUpdate';
+import { useNotificationHandler } from '@/hooks/useNotificationHandler';
 import { ConfigErrorScreen } from '@/screens/ConfigErrorScreen';
 
-import { useNotificationHandler } from '@/hooks/useNotificationHandler';
+import { AuthProvider } from '@/context/AuthContext';
+import { UserModeProvider } from '@/context/UserModeContext';
+import { RootNavigator } from '@/navigation/RootNavigator';
 
 function ConfiguredApp() {
   useNotificationHandler();
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { AuthProvider } = require('@/context/AuthContext') as typeof import('@/context/AuthContext');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { UserModeProvider } = require('@/context/UserModeContext') as typeof import('@/context/UserModeContext');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { RootNavigator } = require('@/navigation/RootNavigator') as typeof import('@/navigation/RootNavigator');
+  // This hook handles web-specific font injection.
+  useAppFonts();
 
   return (
     <AuthProvider>
@@ -52,4 +52,3 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
-

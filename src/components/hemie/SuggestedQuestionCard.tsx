@@ -22,9 +22,7 @@ export function SuggestedQuestionCard({ onPress, question }: SuggestedQuestionCa
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     flexGrow: 1,
     flexShrink: 0,
     minWidth: '46%',

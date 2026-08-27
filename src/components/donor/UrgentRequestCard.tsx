@@ -1,62 +1,143 @@
-import { MapPin } from 'lucide-react-native';
+import { ArrowRight, HeartHandshake, MapPin, MessageCircle, Phone } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { BloodTypeBadge } from '@/components/bloodRequest/BloodTypeBadge';
-import { UrgencyBadge } from '@/components/bloodRequest/UrgencyBadge';
-import { colors, radii, shadows } from '@/constants/theme';
+import { fontFamilies, shadows } from '@/constants/theme';
 import type { BloodRequestUrgency } from '@/types/database';
 
 type UrgentRequestCardProps = {
   bloodType: string;
   distanceLabel: string;
+  hospitalName?: string;
+  unitsNeeded?: number;
+  onCall?: () => void;
+  onChat?: () => void;
   onDetails: () => void;
   onRespond: () => void;
-  timeLabel: string;
+  timeLabel?: string;
   title: string;
   urgency: BloodRequestUrgency;
+};
+
+const URGENCY_CONFIG: Record<
+  BloodRequestUrgency,
+  {
+    tagBg: string;
+    tagText: string;
+    tagLabel: string;
+  }
+> = {
+  critical: {
+    tagBg: '#FEE2E2',
+    tagText: '#DC2626',
+    tagLabel: 'CRITICAL',
+  },
+  urgent: {
+    tagBg: '#FFEDD5',
+    tagText: '#EA580C',
+    tagLabel: 'URGENT',
+  },
+  normal: {
+    tagBg: '#E0F2FE',
+    tagText: '#0284C7',
+    tagLabel: 'NORMAL',
+  },
 };
 
 export function UrgentRequestCard({
   bloodType,
   distanceLabel,
+  hospitalName,
+  unitsNeeded = 1,
+  onCall,
+  onChat,
   onDetails,
   onRespond,
   timeLabel,
   title,
   urgency,
 }: UrgentRequestCardProps) {
+  const urgencyStyle = URGENCY_CONFIG[urgency] || URGENCY_CONFIG.critical;
+  const hospitalDisplay = hospitalName || title;
+
   return (
     <View style={styles.card}>
-      <View style={styles.headerRow}>
-        <BloodTypeBadge bloodType={bloodType} />
-        <View style={styles.headerCopy}>
-          <View style={styles.titleRow}>
-            <Text style={styles.title}>{title}</Text>
-            <UrgencyBadge urgency={urgency} />
+      {/* Top Row: Blood Box + Text Info & Urgency Tag */}
+      <View style={styles.topRow}>
+        <View style={styles.leftInfo}>
+          {/* Blood Box */}
+          <View style={styles.bloodBox}>
+            <Text style={styles.bloodTypeText}>{bloodType}</Text>
           </View>
-          <View style={styles.metaRow}>
-            <MapPin color={colors.mutedLight} size={14} />
-            <Text style={styles.meta}>{distanceLabel}</Text>
-            <Text style={styles.metaDot}>·</Text>
-            <Text style={styles.meta}>{timeLabel}</Text>
+
+          {/* Hospital & Meta */}
+          <View style={styles.textContainer}>
+            <Text numberOfLines={1} style={styles.hospitalText}>
+              {hospitalDisplay}
+            </Text>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaText}>
+                {unitsNeeded} {unitsNeeded === 1 ? 'Unit' : 'Units'} Needed
+              </Text>
+              <Text style={styles.metaDot}>·</Text>
+              <View style={styles.distanceContainer}>
+                <MapPin color="#64748B" size={12} />
+                <Text style={styles.metaText}>{distanceLabel}</Text>
+              </View>
+              {timeLabel ? (
+                <>
+                  <Text style={styles.metaDot}>·</Text>
+                  <Text style={styles.metaText}>{timeLabel}</Text>
+                </>
+              ) : null}
+            </View>
           </View>
+        </View>
+
+        {/* Urgency Tag */}
+        <View style={[styles.urgencyTag, { backgroundColor: urgencyStyle.tagBg }]}>
+          <Text style={[styles.urgencyTagText, { color: urgencyStyle.tagText }]}>
+            {urgencyStyle.tagLabel}
+          </Text>
         </View>
       </View>
 
-      <View style={styles.actions}>
+      {/* Action Row: Donate Button + Call, Chat, Info Icon Buttons */}
+      <View style={styles.actionRow}>
         <Pressable
+          accessibilityLabel="Donate to this blood request"
           accessibilityRole="button"
-          style={({ pressed }) => [styles.respondButton, pressed ? styles.buttonPressed : null]}
+          style={({ pressed }) => [styles.donateButton, pressed ? styles.buttonPressed : null]}
           onPress={onRespond}
         >
-          <Text style={styles.respondText}>Respond</Text>
+          <HeartHandshake color="#FFFFFF" size={16} strokeWidth={2.25} />
+          <Text style={styles.donateButtonText}>Donate</Text>
         </Pressable>
+
         <Pressable
+          accessibilityLabel="Call hospital or requester"
           accessibilityRole="button"
-          style={({ pressed }) => [styles.detailsButton, pressed ? styles.buttonPressed : null]}
+          style={({ pressed }) => [styles.iconButton, pressed ? styles.buttonPressed : null]}
+          onPress={onCall ?? onDetails}
+        >
+          <Phone color="#0F172A" size={16} strokeWidth={2.25} />
+        </Pressable>
+
+        <Pressable
+          accessibilityLabel="Chat with requester"
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.iconButton, pressed ? styles.buttonPressed : null]}
+          onPress={onChat ?? onDetails}
+        >
+          <MessageCircle color="#0F172A" size={16} strokeWidth={2.25} />
+        </Pressable>
+
+        <Pressable
+          accessibilityLabel="View blood request details"
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.iconButton, pressed ? styles.buttonPressed : null]}
           onPress={onDetails}
         >
-          <Text style={styles.detailsText}>Details</Text>
+          <ArrowRight color="#0F172A" size={16} strokeWidth={2.25} />
         </Pressable>
       </View>
     </View>
@@ -64,83 +145,119 @@ export function UrgentRequestCard({
 }
 
 const styles = StyleSheet.create({
-  actions: {
+  actionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    width: '100%',
+  },
+  bloodBox: {
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  bloodTypeText: {
+    color: '#0F172A',
+    fontFamily: fontFamilies.displayHeavy,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  buttonPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.97 }],
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    gap: 12,
+    padding: 14,
+    width: '100%',
+    ...shadows.card,
+  },
+  distanceContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 2,
+  },
+  donateButton: {
+    alignItems: 'center',
+    backgroundColor: '#DC2626',
+    borderRadius: 10,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+    height: 42,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  donateButtonText: {
+    color: '#FFFFFF',
+    fontFamily: fontFamilies.textBold,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  hospitalText: {
+    color: '#0F172A',
+    fontFamily: fontFamilies.textBold,
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  iconButton: {
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  leftInfo: {
+    alignItems: 'center',
+    flex: 1,
     flexDirection: 'row',
     gap: 10,
   },
-  buttonPressed: {
-    opacity: 0.9,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    gap: 14,
-    padding: 16,
-    ...shadows.card,
-  },
-  headerCopy: {
-    flex: 1,
-    gap: 6,
-  },
-  headerRow: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 12,
-  },
-  meta: {
-    color: colors.mutedLight,
-    fontSize: 13,
-  },
   metaDot: {
-    color: colors.mutedLight,
-    fontSize: 13,
+    color: '#94A3B8',
+    fontFamily: fontFamilies.textRegular,
+    fontSize: 11,
   },
   metaRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 4,
+    gap: 6,
   },
-  respondButton: {
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 12,
+  metaText: {
+    color: '#64748B',
+    fontFamily: fontFamilies.textSemibold,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  textContainer: {
     flex: 1,
-    justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: 12,
+    gap: 2,
   },
-  respondText: {
-    color: colors.primaryForeground,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  detailsButton: {
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: 12,
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: 12,
-  },
-  detailsText: {
-    color: colors.foreground,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  title: {
-    color: colors.foreground,
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  titleRow: {
+  topRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  urgencyTag: {
+    alignItems: 'center',
+    borderRadius: 6,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  urgencyTagText: {
+    fontFamily: fontFamilies.textHeavy,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });
+
+

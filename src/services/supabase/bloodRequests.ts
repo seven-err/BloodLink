@@ -13,7 +13,7 @@ export type CreateBloodRequestInput = {
   neededAt: string;
   patientName: string;
   hospitalName: string;
-  contactPhone: string;
+  contactPhone: string | null;
   address: string;
   latitude?: number | null;
   longitude?: number | null;
@@ -42,7 +42,7 @@ export const createBloodRequest = ({
       address: address.trim(),
       attachment_path: attachmentPath ?? null,
       blood_type: bloodType,
-      contact_phone: contactPhone.trim(),
+      contact_phone: contactPhone?.trim() ?? null,
       hospital_name: hospitalName.trim(),
       latitude: latitude ?? null,
       longitude: longitude ?? null,

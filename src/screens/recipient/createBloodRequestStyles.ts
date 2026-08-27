@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { colors } from '@/constants/theme';
+import { colors, radii, shadows } from '@/constants/theme';
 
 export const createBloodRequestStyles = StyleSheet.create({
   bloodTypeGrid: {
@@ -19,8 +19,8 @@ export const createBloodRequestStyles = StyleSheet.create({
     width: '22.5%',
   },
   bloodTypeOptionSelected: {
-    backgroundColor: colors.primaryTint,
-    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.border,
   },
   bloodTypeText: {
     color: colors.foreground,
@@ -73,6 +73,37 @@ export const createBloodRequestStyles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  heroBanner: {
+    backgroundColor: colors.primary,
+    borderRadius: radii.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 18,
+    ...shadows.card,
+  },
+  heroBannerIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 14,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  heroBannerText: {
+    flex: 1,
+    gap: 4,
+  },
+  heroBannerTitle: {
+    color: colors.primaryForeground,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  heroBannerSubtitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    lineHeight: 18,
+  },
   input: {
     color: colors.foreground,
     flex: 1,
@@ -81,24 +112,43 @@ export const createBloodRequestStyles = StyleSheet.create({
     paddingVertical: 12,
   },
   inputMultiline: {
-    minHeight: 110,
+    minHeight: 90,
     textAlignVertical: 'top',
   },
   inputShell: {
     backgroundColor: colors.background,
     borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     flexDirection: 'row',
     paddingHorizontal: 14,
   },
   inputShellError: {
-    borderColor: colors.primary,
+    borderColor: '#94a3b8',
   },
   inputShellWithIcon: {
     alignItems: 'flex-start',
     gap: 8,
     paddingTop: 12,
+  },
+  locationButton: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 48,
+    paddingHorizontal: 14,
+  },
+  locationButtonText: {
+    color: colors.muted,
+    flex: 1,
+    fontSize: 15,
+  },
+  locationButtonTextActive: {
+    color: colors.foreground,
   },
   locationIcon: {
     marginTop: 2,
@@ -108,9 +158,58 @@ export const createBloodRequestStyles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    gap: 18,
-    padding: 24,
+    gap: 16,
+    padding: 20,
     paddingBottom: 24,
+  },
+  section: {
+    gap: 12,
+  },
+  sectionCard: {
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    gap: 16,
+    padding: 16,
+    ...shadows.card,
+  },
+  sectionTitle: {
+    color: colors.foreground,
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  stepperRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 0,
+  },
+  stepperButton: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  stepperButtonText: {
+    color: colors.foreground,
+    fontSize: 22,
+    fontWeight: '600',
+    lineHeight: 26,
+  },
+  stepperValue: {
+    color: colors.foreground,
+    fontSize: 18,
+    fontWeight: '800',
+    minWidth: 60,
+    textAlign: 'center',
+  },
+  stepperUnit: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '600',
   },
   submitButton: {
     alignItems: 'center',
@@ -134,13 +233,13 @@ export const createBloodRequestStyles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 12,
     borderStyle: 'dashed',
     borderWidth: 1.5,
     gap: 8,
     justifyContent: 'center',
-    minHeight: 132,
-    padding: 20,
+    minHeight: 100,
+    padding: 16,
   },
   uploadBoxPressed: {
     opacity: 0.92,
@@ -164,34 +263,34 @@ export const createBloodRequestStyles = StyleSheet.create({
   },
   urgencyOption: {
     alignItems: 'center',
-    backgroundColor: colors.card,
+    backgroundColor: colors.background,
     borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 44,
     paddingHorizontal: 12,
     width: '47.5%',
   },
   urgencyOptionCriticalSelected: {
-    backgroundColor: colors.primaryTint,
-    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.border,
   },
   urgencyOptionHighSelected: {
     backgroundColor: colors.orangeSoft,
-    borderColor: colors.warning,
+    borderColor: colors.border,
   },
   urgencyOptionLowSelected: {
     backgroundColor: colors.infoSoft,
-    borderColor: colors.info,
+    borderColor: colors.border,
   },
   urgencyOptionMediumSelected: {
     backgroundColor: colors.warningSoft,
-    borderColor: colors.warningBorder,
+    borderColor: colors.border,
   },
   urgencyText: {
     color: colors.foreground,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
   },
   urgencyTextCriticalSelected: {

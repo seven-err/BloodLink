@@ -5,9 +5,7 @@ import { colors, radii, shadows } from '@/constants/theme';
 export const recipientHomeStyles = StyleSheet.create({
   bloodTypeCard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 12,
     padding: 16,
     ...shadows.card,
@@ -111,9 +109,7 @@ export const recipientHomeStyles = StyleSheet.create({
   },
   loadErrorCard: {
     backgroundColor: colors.card,
-    borderColor: colors.borderAccent,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 12,
     padding: 16,
   },
@@ -161,4 +157,87 @@ export const recipientHomeStyles = StyleSheet.create({
   viewAllButton: {
     paddingVertical: 4,
   },
+  avatarBox: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  avatarText: {
+    color: colors.primaryForeground,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  headerUserRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  userNameText: {
+    color: colors.foreground,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  userBloodBadge: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primarySoft,
+    borderRadius: 6,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  userBloodBadgeText: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  quickBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginVertical: 2,
+  },
+  quickItem: {
+    alignItems: 'center',
+    flex: 1,
+    gap: 6,
+  },
+  quickIconButton: {
+    alignItems: 'center',
+    borderRadius: 14,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  quickBadge: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    height: 18,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: -4,
+    top: -4,
+    width: 18,
+    borderWidth: 1.5,
+    borderColor: colors.card,
+  },
+  quickBadgeText: {
+    color: colors.primaryForeground,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  quickLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 });
+

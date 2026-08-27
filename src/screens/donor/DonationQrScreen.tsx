@@ -1,12 +1,15 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScrollView, Text, View } from 'react-native';
+import { ArrowLeft } from 'lucide-react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
 
 import { Skeleton } from '@/components/common/Skeleton';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { URGENCY_LABELS } from '@/constants/bloodRequestUrgency';
+import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import type { AppStackParamList } from '@/navigation/types';
 import { authStyles } from '@/screens/auth/styles';
@@ -51,7 +54,7 @@ function QrSuccessView({ details }: { details: DonationQrDetails }) {
           <View
             style={{
               backgroundColor: '#fff',
-              borderColor: '#fecaca',
+              borderColor: colors.border,
               borderRadius: 20,
               borderWidth: 1,
               padding: 16,
@@ -79,32 +82,40 @@ function QrSuccessView({ details }: { details: DonationQrDetails }) {
   );
 }
 
+import { appCache } from '@/utils/appCache';
+
 export function DonationQrScreen({ navigation, route }: Props) {
+  const { top: topInset } = useSafeAreaInsets();
   const { donationId, matchId } = route.params;
   const { session } = useAuth();
   const donorId = session?.user.id;
 
-  const [details, setDetails] = useState<DonationQrDetails | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = `donation_qr:${donationId ?? ''}:${matchId ?? ''}`;
+  const cachedDetails = appCache.getSync<DonationQrDetails>(cacheKey);
+
+  const [details, setDetails] = useState<DonationQrDetails | null>(() => cachedDetails ?? null);
+  const [loading, setLoading] = useState(() => !cachedDetails);
   const [error, setError] = useState<string | null>(null);
   const [ineligibleMessage, setIneligibleMessage] = useState<string | null>(null);
 
-  const loadQrDetails = useCallback(async () => {
+  const loadQrDetails = useCallback(async (isSilent = false) => {
     if (!donorId) {
       setError('You need to be signed in as a donor to view this QR code.');
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (!isSilent && !appCache.getSync(cacheKey)) {
+      setLoading(true);
+    }
     setError(null);
     setIneligibleMessage(null);
-    setDetails(null);
 
     const result = await getDonationQrDetailsForDonor(donorId, { donationId, matchId });
 
     if (result.kind === 'success') {
       setDetails(result.details);
+      appCache.setSync(cacheKey, result.details);
       setLoading(false);
       return;
     }
@@ -123,17 +134,17 @@ export function DonationQrScreen({ navigation, route }: Props) {
 
     setError(result.message);
     setLoading(false);
-  }, [donationId, donorId, matchId]);
+  }, [cacheKey, donationId, donorId, matchId]);
 
   useFocusEffect(
     useCallback(() => {
-      void loadQrDetails();
+      void loadQrDetails(true);
     }, [loadQrDetails]),
   );
 
   if (loading) {
     return (
-      <View style={[recipientStyles.screen, { gap: 16, padding: 24 }]}>
+      <View style={[recipientStyles.screen, { gap: 16, padding: 24, paddingTop: topInset + 16 }]}>
         <Skeleton borderRadius={16} height={96} width="100%" />
         <Skeleton borderRadius={16} height={280} width="100%" />
         <Skeleton borderRadius={16} height={120} width="100%" />
@@ -165,12 +176,41 @@ export function DonationQrScreen({ navigation, route }: Props) {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={recipientStyles.scrollContent}
-      style={recipientStyles.screen}
-    >
-      <QrSuccessView details={details} />
-      <PrimaryButton title="Back to donations" onPress={() => navigation.navigate('MyDonations')} />
-    </ScrollView>
+    <View style={recipientStyles.screen}>
+      <View
+        style={{
+          alignItems: 'center',
+          backgroundColor: colors.card,
+          borderBottomColor: colors.border,
+          borderBottomWidth: 1,
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          paddingBottom: 12,
+          paddingHorizontal: 16,
+          paddingTop: topInset + 8,
+        }}
+      >
+        <Pressable
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={() => navigation.goBack()}
+        >
+          <ArrowLeft color={colors.foreground} size={22} />
+        </Pressable>
+        <Text style={{ color: colors.foreground, fontSize: 17, fontWeight: '700' }}>
+          Donation QR Pass
+        </Text>
+        <View style={{ width: 22 }} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={recipientStyles.scrollContent}
+        style={{ flex: 1 }}
+      >
+        <QrSuccessView details={details} />
+        <PrimaryButton title="Back to donations" onPress={() => navigation.navigate('MyDonations')} />
+      </ScrollView>
+    </View>
   );
 }

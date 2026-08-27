@@ -27,6 +27,8 @@ import {
   type ConversationPreview,
 } from '@/services/supabase/messages';
 
+import { appCache } from '@/utils/appCache';
+
 type Props = CompositeScreenProps<
   BottomTabScreenProps<AppTabParamList, 'Chat'>,
   NativeStackScreenProps<AppStackParamList>
@@ -65,15 +67,20 @@ export function MessagesScreen({ navigation }: Props) {
   const { top: topInset } = useSafeAreaInsets();
   const { session } = useAuth();
   const userId = session?.user.id;
+  const cachedConversations = userId
+    ? appCache.getSync<ConversationPreview[]>(`conversations:${userId}`)
+    : undefined;
 
-  const [conversations, setConversations] = useState<ConversationPreview[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [conversations, setConversations] = useState<ConversationPreview[]>(
+    () => cachedConversations ?? [],
+  );
+  const [loading, setLoading] = useState(() => cachedConversations === undefined);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const loadConversations = useCallback(
-    async (isRefresh = false) => {
+    async (isRefresh = false, isSilent = false) => {
       if (!userId) {
         setError('You must be signed in to view messages.');
         setConversations([]);
@@ -84,7 +91,7 @@ export function MessagesScreen({ navigation }: Props) {
 
       if (isRefresh) {
         setRefreshing(true);
-      } else {
+      } else if (!isSilent && !appCache.getSync(`conversations:${userId}`)) {
         setLoading(true);
       }
 
@@ -94,9 +101,13 @@ export function MessagesScreen({ navigation }: Props) {
 
       if (loadError) {
         setError(loadError.message);
-        setConversations([]);
+        if (!isSilent && !appCache.getSync(`conversations:${userId}`)) {
+          setConversations([]);
+        }
       } else {
-        setConversations(data ?? []);
+        const fresh = data ?? [];
+        setConversations(fresh);
+        appCache.setSync(`conversations:${userId}`, fresh);
       }
 
       setLoading(false);
@@ -107,7 +118,7 @@ export function MessagesScreen({ navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      void loadConversations();
+      void loadConversations(false, true);
     }, [loadConversations]),
   );
 
@@ -184,9 +195,14 @@ export function MessagesScreen({ navigation }: Props) {
           ) : (
             <View style={messagesStyles.emptyCard}>
               <Text style={messagesStyles.emptyText}>
-                No conversations yet. Accepted donation matches will appear here so you can
-                coordinate securely.
+                No active conversations yet. Messaging is unlocked when a donor match is accepted for a blood request.
               </Text>
+              <View style={{ marginTop: 14, width: '100%', gap: 10 }}>
+                <PrimaryButton
+                  title="Explore Blood Requests"
+                  onPress={() => navigation.navigate('Requests')}
+                />
+              </View>
             </View>
           )
         }

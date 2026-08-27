@@ -9,13 +9,15 @@ export const donorRequestFeedStyles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radii.pill,
     borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
     justifyContent: 'center',
     minHeight: 38,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
   },
   chipActive: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    borderColor: colors.border,
   },
   chipLabel: {
     color: colors.muted,
@@ -35,9 +37,7 @@ export const donorRequestFeedStyles = StyleSheet.create({
   },
   emptyCard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     padding: 20,
     ...shadows.card,
   },

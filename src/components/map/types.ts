@@ -14,6 +14,8 @@ export type MapMarker = {
   title: string;
   description?: string;
   pinColor?: string;
+  selectedPinColor?: string;
+  bloodType?: string;
 };
 
 export type OpenStreetMapViewHandle = {

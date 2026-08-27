@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   inputError: {
-    borderColor: '#dc2626',
+    borderColor: '#94a3b8',
   },
   inputShell: {
     alignItems: 'center',

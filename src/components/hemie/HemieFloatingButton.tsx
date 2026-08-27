@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderColor: colors.border,
     borderRadius: RING_SIZE / 2,
-    borderWidth: 2,
+    borderWidth: 1, // Softened border
     height: RING_SIZE,
     justifyContent: 'center',
     width: RING_SIZE,
@@ -69,10 +69,10 @@ const styles = StyleSheet.create({
   shadow: {
     borderRadius: RING_SIZE / 2,
     ...shadows.card,
-    elevation: 10,
+    elevation: 1,
     shadowColor: '#000',
-    shadowOffset: { height: 8, width: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
+    shadowOffset: { height: 2, width: 0 },
+    shadowOpacity: 0.02,
+    shadowRadius: 8,
   },
 });

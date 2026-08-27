@@ -11,6 +11,7 @@ import {
   CircleHelp,
   Droplet,
   LogOut,
+  QrCode,
   Mail,
   MapPin,
   Phone,
@@ -19,17 +20,17 @@ import {
   UserRound,
 } from 'lucide-react-native';
 import { useCallback, useState, type ReactNode } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DonorVerificationBadge } from '@/components/donor/DonorVerificationBadge';
-import { ModeToggle } from '@/components/common/ModeToggle';
+
 import { SignOutConfirmModal } from '@/components/common/SignOutConfirmModal';
 import { Skeleton } from '@/components/common/Skeleton';
 import { ProfileAvatar } from '@/components/profile/ProfileAvatar';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import { useUserMode, type UserMode } from '@/context/UserModeContext';
+
 import { useSignOut } from '@/hooks/useSignOut';
 import type { AppTabParamList } from '@/navigation/AppTabNavigator';
 import type { AppStackParamList } from '@/navigation/types';
@@ -43,7 +44,9 @@ import {
   getLatestDonorVerification,
   getProfile,
   isDonorVerificationActive,
+  setDonorAvailability,
 } from '@/services/supabase/profiles';
+import { canDonorEnableAvailability } from '@/utils/donorAvailability';
 import { getDonorEligibilityStat } from '@/utils/donorDonationStats';
 import {
   resolveDonorVerificationDisplay,
@@ -51,6 +54,7 @@ import {
 } from '@/utils/donorVerificationDisplay';
 import { formatRoleLabel } from '@/utils/profileDisplay';
 import { sanitizeProfileError } from '@/utils/profileErrors';
+import { appCache } from '@/utils/appCache';
 import { profileScreenStyles as styles } from './profileScreenStyles';
 
 type Props = CompositeScreenProps<
@@ -85,20 +89,7 @@ const computeResponseRate = (statuses: string[]) => {
   return Math.round((positive / responded.length) * 100);
 };
 
-const getModeDisplayLabel = (mode: UserMode) =>
-  mode === 'donate' ? 'Donate' : 'Request';
 
-const getModeSubtitle = (mode: UserMode, role: string | null | undefined) => {
-  if (mode === 'request') {
-    return role === 'recipient'
-      ? 'Finding compatible donors for your requests'
-      : 'Browsing as a requester to find compatible donors';
-  }
-
-  return role === 'donor'
-    ? 'Ready to respond to nearby blood requests'
-    : 'Available to help when donors are needed nearby';
-};
 
 function ProfileSkeleton({ topInset }: { topInset: number }) {
   return (
@@ -170,43 +161,88 @@ function ProfileMenuRow({
   );
 }
 
-function RecentDonationRow({ item }: { item: DonorDonationListItem }) {
+function RecentDonationRow({
+  item,
+  onPress,
+}: {
+  item: DonorDonationListItem;
+  onPress?: () => void;
+}) {
   const isCompleted =
     item.donationStatus === 'completed' || item.matchStatus === 'completed';
 
+  const statusLabel = item.donationStatus
+    ? item.donationStatus.replace('_', ' ')
+    : item.matchStatus;
+
   return (
-    <View style={styles.donationItem}>
-      <View style={styles.donationIconWrap}>
-        <Calendar color={colors.primary} size={18} />
-      </View>
-      <View style={styles.donationTextWrap}>
-        <Text style={styles.donationHospital}>{item.hospitalName}</Text>
-        <Text style={styles.donationDate}>
-          {formatDonationDate(item.completedAt ?? item.scheduledAt ?? item.createdAt)}
+    <Pressable
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.donationItem, pressed ? { opacity: 0.8 } : null]}
+      onPress={onPress}
+    >
+      <View style={styles.donationHeaderRow}>
+        <Text numberOfLines={1} style={styles.donationHospital}>
+          {item.hospitalName}
         </Text>
-      </View>
-      {isCompleted ? (
         <View
-          style={{
-            alignItems: 'center',
-            backgroundColor: colors.successSoft,
-            borderRadius: 999,
-            height: 28,
-            justifyContent: 'center',
-            width: 28,
-          }}
+          style={[
+            styles.donationStatusPill,
+            !isCompleted ? styles.donationStatusPillActive : null,
+          ]}
         >
-          <Check color={colors.success} size={16} strokeWidth={3} />
+          {isCompleted ? (
+            <Check color={colors.success} size={12} strokeWidth={2.5} />
+          ) : null}
+          <Text
+            style={[
+              styles.donationStatusText,
+              !isCompleted ? styles.donationStatusTextActive : null,
+            ]}
+          >
+            {statusLabel}
+          </Text>
         </View>
-      ) : null}
-    </View>
+      </View>
+
+      <View style={styles.donationMetaRow}>
+        <View style={styles.donationBadgeRow}>
+          <View style={styles.donationBloodBadge}>
+            <Droplet color={colors.primary} fill={colors.primary} size={12} />
+            <Text style={styles.donationBloodBadgeText}>{item.bloodType}</Text>
+          </View>
+          <Text style={styles.donationUnitsText}>
+            {item.unitsNeeded} unit{item.unitsNeeded === 1 ? '' : 's'}
+          </Text>
+        </View>
+
+        <View style={styles.donationDateRow}>
+          <Calendar color={colors.muted} size={13} />
+          <Text style={styles.donationDate}>
+            {formatDonationDate(item.completedAt ?? item.scheduledAt ?? item.createdAt)}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
   );
 }
+
+type CachedProfileDashboard = {
+  verificationActive: boolean;
+  donorVerificationStatus: DonorVerificationDisplay;
+  totalDonations: number;
+  responseRate: number | null;
+  recentDonations: DonorDonationListItem[];
+};
 
 export function UserProfileScreen({ navigation }: Props) {
   const { top: topInset } = useSafeAreaInsets();
   const { profile, refreshProfile, session } = useAuth();
-  const { mode } = useUserMode();
+  const userId = session?.user.id;
+  const cachedDashboard = userId
+    ? appCache.getSync<CachedProfileDashboard>(`profile:dashboard:${userId}`)
+    : undefined;
+
   const {
     cancelSignOut,
     clearSignOutError,
@@ -217,16 +253,30 @@ export function UserProfileScreen({ navigation }: Props) {
     signingOut,
   } = useSignOut();
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(
+    () => profile?.role === 'donor' && cachedDashboard === undefined,
+  );
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [donorVerificationStatus, setDonorVerificationStatus] =
-    useState<DonorVerificationDisplay>('pending');
-  const [totalDonations, setTotalDonations] = useState(0);
-  const [responseRate, setResponseRate] = useState<number | null>(null);
-  const [recentDonations, setRecentDonations] = useState<DonorDonationListItem[]>([]);
+    useState<DonorVerificationDisplay>(() => cachedDashboard?.donorVerificationStatus ?? 'pending');
+  const [totalDonations, setTotalDonations] = useState(() => cachedDashboard?.totalDonations ?? 0);
+  const [responseRate, setResponseRate] = useState<number | null>(
+    () => cachedDashboard?.responseRate ?? null,
+  );
+  const [recentDonations, setRecentDonations] = useState<DonorDonationListItem[]>(
+    () => cachedDashboard?.recentDonations ?? [],
+  );
+  const [verificationActive, setVerificationActive] = useState(
+    () => cachedDashboard?.verificationActive ?? false,
+  );
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [availabilityOverride, setAvailabilityOverride] = useState<boolean | null>(null);
 
   const isDonor = profile?.role === 'donor';
+  const canEnableAvailability = canDonorEnableAvailability(profile, verificationActive);
+  const isAvailable = availabilityOverride ?? profile?.is_available ?? false;
   const email = session?.user.email?.trim() || null;
   const phone = profile?.phone?.trim() || session?.user.phone?.trim() || null;
   const location = profile?.address?.trim() || null;
@@ -248,10 +298,52 @@ export function UserProfileScreen({ navigation }: Props) {
     [navigation],
   );
 
-  const loadProfileData = useCallback(async () => {
+  const handleAvailabilityToggle = async (nextValue: boolean) => {
+    if (!session?.user.id || availabilityLoading) {
+      return;
+    }
+
+    if (nextValue && !canEnableAvailability) {
+      setAvailabilityError(
+        'Complete your donor profile (blood type, birthdate, and weight) before turning on availability.',
+      );
+      setAvailabilityOverride(null);
+      return;
+    }
+
+    setAvailabilityLoading(true);
+    setAvailabilityError(null);
+    setAvailabilityOverride(nextValue);
+
+    try {
+      const { error: updateError } = await setDonorAvailability(session.user.id, nextValue);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      await refreshProfile();
+      setAvailabilityOverride(null);
+    } catch (toggleError) {
+      setAvailabilityOverride(null);
+      setAvailabilityError(
+        sanitizeProfileError(toggleError, 'Unable to update availability. Please try again.'),
+      );
+    } finally {
+      setAvailabilityLoading(false);
+    }
+  };
+
+  const loadProfileData = useCallback(async (isRefresh = false, isSilent = false) => {
     if (!session?.user.id) {
       setLoading(false);
       return;
+    }
+
+    if (isRefresh) {
+      setRefreshing(true);
+    } else if (!isSilent && !appCache.getSync(`profile:dashboard:${session.user.id}`)) {
+      setLoading(true);
     }
 
     setError(null);
@@ -263,6 +355,7 @@ export function UserProfileScreen({ navigation }: Props) {
 
       if (freshProfile?.role !== 'donor') {
         setDonorVerificationStatus('pending');
+        setVerificationActive(false);
         setTotalDonations(0);
         setResponseRate(null);
         setRecentDonations([]);
@@ -293,12 +386,14 @@ export function UserProfileScreen({ navigation }: Props) {
         throw matchesResult.error;
       }
 
-      setDonorVerificationStatus(
-        resolveDonorVerificationDisplay({
-          latestStatus: latestVerificationResult.data?.status ?? null,
-          verificationActive: Boolean(verificationResult.data),
-        }),
-      );
+      const isVerificationActiveResult = Boolean(verificationResult.data);
+      const resolvedStatus = resolveDonorVerificationDisplay({
+        latestStatus: latestVerificationResult.data?.status ?? null,
+        verificationActive: isVerificationActiveResult,
+      });
+
+      setVerificationActive(isVerificationActiveResult);
+      setDonorVerificationStatus(resolvedStatus);
 
       const completedDonations = (donationsResult.data ?? []).filter(
         (item) => item.donationStatus === 'completed' || item.matchStatus === 'completed',
@@ -306,17 +401,26 @@ export function UserProfileScreen({ navigation }: Props) {
       setTotalDonations(completedDonations.length);
 
       const statuses = (matchesResult.data ?? []).map((match) => match.status);
-      setResponseRate(computeResponseRate(statuses));
+      const computedRate = computeResponseRate(statuses);
+      setResponseRate(computedRate);
 
-      setRecentDonations(
-        [...completedDonations]
-          .sort((left, right) => {
-            const leftDate = new Date(left.completedAt ?? left.createdAt).getTime();
-            const rightDate = new Date(right.completedAt ?? right.createdAt).getTime();
-            return rightDate - leftDate;
-          })
-          .slice(0, 3),
-      );
+      const sortedRecent = [...completedDonations]
+        .sort((left, right) => {
+          const leftDate = new Date(left.completedAt ?? left.createdAt).getTime();
+          const rightDate = new Date(right.completedAt ?? right.createdAt).getTime();
+          return rightDate - leftDate;
+        })
+        .slice(0, 3);
+
+      setRecentDonations(sortedRecent);
+
+      appCache.setSync(`profile:dashboard:${session.user.id}`, {
+        verificationActive: isVerificationActiveResult,
+        donorVerificationStatus: resolvedStatus,
+        totalDonations: completedDonations.length,
+        responseRate: computedRate,
+        recentDonations: sortedRecent,
+      });
     } catch (loadError) {
       setError(sanitizeProfileError(loadError, 'Unable to load profile data.'));
     } finally {
@@ -327,8 +431,7 @@ export function UserProfileScreen({ navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      void loadProfileData();
+      void loadProfileData(false, true);
     }, [loadProfileData]),
   );
 
@@ -423,35 +526,7 @@ export function UserProfileScreen({ navigation }: Props) {
                 </View>
               </View>
 
-              <Pressable
-                accessibilityRole="button"
-                style={({ pressed }) => [
-                  styles.editProfileButton,
-                  pressed ? { opacity: 0.7 } : null,
-                ]}
-                onPress={() => navigateToStack('EditProfile')}
-              >
-                <UserRound color={colors.foreground} size={18} />
-                <Text style={styles.editProfileText}>Edit Profile</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.modeCard}>
-              <View style={styles.modeSection}>
-                <Text style={styles.modeStatusLabel}>
-                  {getModeDisplayLabel(mode)} mode
-                </Text>
-                <Text style={styles.modeSubtitle}>
-                  {getModeSubtitle(mode, profile.role)}
-                </Text>
-                <View style={styles.modeToggleWrap}>
-                  <ModeToggle />
-                </View>
-              </View>
-            </View>
-
-            {isDonor ? (
-              <View style={styles.statsCard}>
+              {isDonor ? (
                 <View style={styles.statRow}>
                   <View style={styles.statColumn}>
                     <Text style={styles.statValuePrimary}>{totalDonations}</Text>
@@ -474,8 +549,87 @@ export function UserProfileScreen({ navigation }: Props) {
                     <Text style={styles.statLabel}>Response</Text>
                   </View>
                 </View>
+              ) : null}
+
+              <View style={styles.actionRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.editProfileButton,
+                    isDonor ? styles.editProfileButtonDonor : null,
+                    pressed ? { opacity: 0.7 } : null,
+                  ]}
+                  onPress={() => navigateToStack('EditProfile')}
+                >
+                  <UserRound color={colors.foreground} size={16} />
+                  <Text numberOfLines={1} style={styles.editProfileText}>Edit Profile</Text>
+                </Pressable>
+
+                {isDonor ? (
+                  <>
+                    <View
+                      style={[
+                        styles.availabilityCard,
+                        isAvailable ? styles.availabilityCardActive : null,
+                      ]}
+                    >
+                      <View style={styles.availabilityCopy}>
+                        <View style={styles.availabilityTitleRow}>
+                          <Droplet
+                            color={isAvailable ? colors.primary : colors.mutedLight}
+                            fill={isAvailable ? colors.primary : 'none'}
+                            size={13}
+                          />
+                          <Text
+                            numberOfLines={1}
+                            style={[
+                              styles.availabilityTitle,
+                              isAvailable ? { color: colors.success } : null,
+                            ]}
+                          >
+                            Donate
+                          </Text>
+                        </View>
+                      </View>
+                      <Switch
+                        accessibilityLabel="Donation availability"
+                        accessibilityState={{ checked: isAvailable, disabled: availabilityLoading }}
+                        disabled={availabilityLoading}
+                        thumbColor={colors.primaryForeground}
+                        trackColor={{ false: '#e2e8f0', true: colors.success }}
+                        value={isAvailable}
+                        onValueChange={(value) => {
+                          void handleAvailabilityToggle(value);
+                        }}
+                        style={{ transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] }}
+                      />
+                    </View>
+                    <Pressable
+                      accessibilityLabel="View QR Pass"
+                      accessibilityRole="button"
+                      style={({ pressed }) => [
+                        styles.qrButton,
+                        pressed ? { opacity: 0.7 } : null,
+                      ]}
+                      onPress={() => navigateToStack('ProfileQr')}
+                    >
+                      <QrCode color={colors.foreground} size={18} />
+                    </Pressable>
+                  </>
+                ) : null}
               </View>
-            ) : null}
+
+              {!canEnableAvailability && !isAvailable && isDonor ? (
+                <Text style={styles.availabilityHint}>
+                  Complete your donor profile to enable donation availability.
+                </Text>
+              ) : null}
+              {availabilityError ? (
+                <Text style={styles.availabilityError}>{availabilityError}</Text>
+              ) : null}
+            </View>
+
+
 
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Contact Information</Text>
@@ -517,7 +671,16 @@ export function UserProfileScreen({ navigation }: Props) {
                   </Text>
                 ) : (
                   recentDonations.map((item) => (
-                    <RecentDonationRow key={item.matchId} item={item} />
+                    <RecentDonationRow
+                      key={item.matchId}
+                      item={item}
+                      onPress={() =>
+                        navigateToStack('DonationQr', {
+                          donationId: item.donationId ?? undefined,
+                          matchId: item.matchId,
+                        })
+                      }
+                    />
                   ))
                 )}
               </View>

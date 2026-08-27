@@ -1,4 +1,4 @@
-import { MapPin } from 'lucide-react-native';
+import { ChevronRight, MapPin, MessageCircle, Phone, Send } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BloodTypeBadge } from '@/components/bloodRequest/BloodTypeBadge';
@@ -9,6 +9,8 @@ type NearbyDonorFeedCardProps = {
   distanceLabel: string;
   isAvailable: boolean;
   name: string;
+  onCall?: () => void;
+  onChat?: () => void;
   onDetails: () => void;
   onRequest: () => void;
   timeLabel: string;
@@ -19,6 +21,8 @@ export function NearbyDonorFeedCard({
   distanceLabel,
   isAvailable,
   name,
+  onCall,
+  onChat,
   onDetails,
   onRequest,
   timeLabel,
@@ -57,18 +61,42 @@ export function NearbyDonorFeedCard({
 
       <View style={styles.actions}>
         <Pressable
+          accessibilityLabel={`Request blood from ${name}`}
           accessibilityRole="button"
           style={({ pressed }) => [styles.requestButton, pressed ? styles.buttonPressed : null]}
           onPress={onRequest}
         >
-          <Text style={styles.requestText}>Request</Text>
+          <Send color={colors.primaryForeground} size={15} strokeWidth={2.25} />
+          <Text style={styles.requestText}>Request Blood</Text>
         </Pressable>
+        {onCall ? (
+          <Pressable
+            accessibilityLabel={`Call ${name}`}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.iconButton, pressed ? styles.buttonPressed : null]}
+            onPress={onCall}
+          >
+            <Phone color="#0F172A" size={16} strokeWidth={2.25} />
+          </Pressable>
+        ) : null}
+        {onChat ? (
+          <Pressable
+            accessibilityLabel={`Chat with ${name}`}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.iconButton, pressed ? styles.buttonPressed : null]}
+            onPress={onChat}
+          >
+            <MessageCircle color="#0F172A" size={16} strokeWidth={2.25} />
+          </Pressable>
+        ) : null}
         <Pressable
+          accessibilityLabel="View donor details"
           accessibilityRole="button"
           style={({ pressed }) => [styles.detailsButton, pressed ? styles.buttonPressed : null]}
           onPress={onDetails}
         >
           <Text style={styles.detailsText}>Details</Text>
+          <ChevronRight color={colors.foreground} size={16} strokeWidth={2.25} />
         </Pressable>
       </View>
     </View>
@@ -77,20 +105,45 @@ export function NearbyDonorFeedCard({
 
 const styles = StyleSheet.create({
   actions: {
+    alignItems: 'center',
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   buttonPressed: {
     opacity: 0.9,
+    transform: [{ scale: 0.98 }],
+  },
+  iconButton: {
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
   },
   card: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 14,
     padding: 16,
     ...shadows.card,
+  },
+  detailsButton: {
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 4,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 14,
+  },
+  detailsText: {
+    color: colors.foreground,
+    fontSize: 14,
+    fontWeight: '700',
   },
   headerCopy: {
     flex: 1,
@@ -119,28 +172,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: 12,
     flex: 1,
+    flexDirection: 'row',
+    gap: 6,
     justifyContent: 'center',
     minHeight: 44,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
   },
   requestText: {
     color: colors.primaryForeground,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  detailsButton: {
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: 12,
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: 12,
-  },
-  detailsText: {
-    color: colors.foreground,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -179,3 +218,4 @@ const styles = StyleSheet.create({
     gap: 8,
   },
 });
+

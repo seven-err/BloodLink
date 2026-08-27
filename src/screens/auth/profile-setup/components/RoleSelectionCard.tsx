@@ -40,15 +40,13 @@ const styles = StyleSheet.create({
   card: {
     alignItems: 'center',
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: 16,
     padding: 16,
   },
   cardSelected: {
-    borderColor: colors.primary,
+    backgroundColor: '#f8fafc',
   },
   copy: {
     flex: 1,

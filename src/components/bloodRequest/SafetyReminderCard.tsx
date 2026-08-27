@@ -22,9 +22,7 @@ export function SafetyReminderCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.warningSoft,
-    borderColor: colors.warningBorder,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 6,
     padding: 14,
   },

@@ -6,8 +6,18 @@
  * must therefore be read with a static property access.
  */
 
+import { Platform } from 'react-native';
+
 const trim = (v: string | undefined): string | undefined =>
   v?.trim() ? v.trim() : undefined;
+
+const sanitizeApiUrl = (url: string | undefined): string => {
+  const trimmed = trim(url) ?? 'http://localhost:3001';
+  if (Platform.OS === 'android' && trimmed.includes('localhost')) {
+    return trimmed.replace('localhost', '10.0.2.2');
+  }
+  return trimmed;
+};
 
 const supabaseUrl = trim(process.env.EXPO_PUBLIC_SUPABASE_URL);
 const supabaseAnonKey = trim(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
@@ -27,7 +37,7 @@ export const env = {
   // App shows a boot screen via hasRequiredEnv instead of a silent crash.
   supabaseUrl: supabaseUrl ?? '',
   supabaseAnonKey: supabaseAnonKey ?? '',
-  apiBaseUrl: trim(process.env.EXPO_PUBLIC_API_URL) ?? 'http://localhost:3001',
+  apiBaseUrl: sanitizeApiUrl(process.env.EXPO_PUBLIC_API_URL),
   nominatimBaseUrl:
     trim(process.env.EXPO_PUBLIC_NOMINATIM_URL) ?? 'https://nominatim.openstreetmap.org',
   osrmBaseUrl:

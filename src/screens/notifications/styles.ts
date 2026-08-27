@@ -5,9 +5,7 @@ import { colors, radii, shadows } from '@/constants/theme';
 export const notificationStyles = StyleSheet.create({
   emptyCard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     padding: 20,
     ...shadows.card,
   },

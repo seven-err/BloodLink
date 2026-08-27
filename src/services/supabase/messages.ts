@@ -197,6 +197,26 @@ export const resolveConversationRouteParams = async (
     };
   }
 
+  // This is the donor's view of the conversation, so `otherPartyId` is the requester's ID.
+  const { data: requesterProfile, error: profileError } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', otherPartyId)
+    .single();
+
+  if (profileError) {
+    console.warn(`Could not fetch profile for ${otherPartyId}: ${profileError.message}`);
+  }
+
+  if (requesterProfile?.full_name?.trim()) {
+    return {
+      kind: 'success',
+      recipientId: otherPartyId,
+      recipientDisplayName: requesterProfile.full_name.trim(),
+    };
+  }
+
+  // Fallback to the original method if the profile isn't available
   const { data: requestDetails, error: requestDetailsError } = await supabase
     .from('blood_requests')
     .select('hospital_name, contact_phone')
@@ -299,6 +319,19 @@ export const listConversations = async (currentUserId: string) => {
     return { data: null, error: donorSummaryError };
   }
 
+  const requesterIds = [...new Set((requests ?? []).map((r) => r.requester_id).filter(Boolean))];
+
+  const { data: requesterProfiles, error: requesterProfilesError } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .in('id', requesterIds);
+
+  if (requesterProfilesError) {
+    return { data: null, error: requesterProfilesError };
+  }
+
+  const requesterProfileById = new Map((requesterProfiles ?? []).map((p) => [p.id, p]));
+
   type ConversationMessage = NonNullable<typeof rawMessages>[number];
 
   const messagesByMatch = new Map<string, ConversationMessage[]>();
@@ -336,8 +369,10 @@ export const listConversations = async (currentUserId: string) => {
 
     const otherPartyId = isDonor ? requesterId : match.donor_id;
     const donorSummary = donorSummaryByMatchId.get(match.id);
+    const requesterProfile = requesterId ? requesterProfileById.get(requesterId) : undefined;
+
     const displayName = isDonor
-      ? getRequesterContactLabel(request)
+      ? requesterProfile?.full_name?.trim() || getRequesterContactLabel(request)
       : donorSummary?.donor_name?.trim() || 'BloodLink donor';
     const bloodType = isDonor ? null : (donorSummary?.donor_blood_type ?? null);
 

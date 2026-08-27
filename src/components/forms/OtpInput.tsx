@@ -84,13 +84,14 @@ const styles = StyleSheet.create({
     maxWidth: 52,
   },
   boxActive: {
-    borderColor: '#e50914',
+    borderColor: '#0f172a',
+    backgroundColor: '#f8fafc',
   },
   boxError: {
-    borderColor: '#dc2626',
+    borderColor: '#94a3b8',
   },
   boxFilled: {
-    borderColor: '#d1d5db',
+    borderColor: '#94a3b8',
   },
   digit: {
     color: '#202124',

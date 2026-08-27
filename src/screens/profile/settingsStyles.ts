@@ -5,9 +5,7 @@ import { colors, radii, shadows } from '@/constants/theme';
 export const settingsStyles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     overflow: 'hidden',
     ...shadows.card,
   },
@@ -118,9 +116,7 @@ export const settingsStyles = StyleSheet.create({
   },
   detailCard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 12,
     padding: 20,
     ...shadows.card,

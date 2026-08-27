@@ -1,78 +1,78 @@
 {
-  "expo": {
-    "name": "BloodLink",
-    "slug": "BloodLink",
-    "scheme": "bloodlink",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/b56928d4-78a9-42f2-86df-c959ef323bfb",
-      "checkAutomatically": "WIFI_ONLY",
-      "fallbackToCacheTimeout": 3000
-    },
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./src/assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./src/assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
-    "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./src/assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "softwareKeyboardLayoutMode": "resize",
-      "permissions": [
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.RECORD_AUDIO"
-      ],
-      "package": "com.sevenerr.BloodLink"
-    },
-    "web": {
-      "favicon": "./src/assets/favicon.png"
-    },
-    "plugins": [
-      "expo-secure-store",
-      [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": "Allow BloodLink to use precise GPS so nearby donors and requests show accurate distances on the map."
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Allow BloodLink to access your photos so you can set a profile picture."
-        }
-      ],
-      "expo-web-browser",
-      [
-        "expo-notifications",
-        {
-          "icon": "./src/assets/icon.png",
-          "color": "#b91c1c"
-        }
-      ],
-      "@maplibre/maplibre-react-native",
-      "@react-native-google-signin/google-signin",
-      "expo-status-bar"
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "b56928d4-78a9-42f2-86df-c959ef323bfb"
-      }
-    },
-    "owner": "seven-err"
-  }
+    "expo":  {
+                 "name":  "BloodLink",
+                 "slug":  "bloodlink",
+                 "scheme":  "bloodlink",
+                 "runtimeVersion":  {
+                                        "policy":  "appVersion"
+                                    },
+                 "updates":  {
+                                 "url":  "https://u.expo.dev/4e0d258f-9fe8-460e-a8e3-da476c5d50b8",
+                                 "checkAutomatically":  "WIFI_ONLY",
+                                 "fallbackToCacheTimeout":  3000
+                             },
+                 "version":  "1.0.0",
+                 "orientation":  "portrait",
+                 "icon":  "./src/assets/icon.png",
+                 "userInterfaceStyle":  "light",
+                 "newArchEnabled":  true,
+                 "splash":  {
+                                "image":  "./src/assets/splash-icon.png",
+                                "resizeMode":  "contain",
+                                "backgroundColor":  "#ffffff"
+                            },
+                 "ios":  {
+                             "supportsTablet":  true
+                         },
+                 "android":  {
+                                 "adaptiveIcon":  {
+                                                      "foregroundImage":  "./src/assets/adaptive-icon.png",
+                                                      "backgroundColor":  "#ffffff"
+                                                  },
+                                 "edgeToEdgeEnabled":  true,
+                                 "predictiveBackGestureEnabled":  false,
+                                 "softwareKeyboardLayoutMode":  "resize",
+                                 "permissions":  [
+                                                     "android.permission.ACCESS_COARSE_LOCATION",
+                                                     "android.permission.ACCESS_FINE_LOCATION",
+                                                     "android.permission.RECORD_AUDIO"
+                                                 ],
+                                 "package":  "com.sevenerr.BloodLink"
+                             },
+                 "web":  {
+                             "favicon":  "./src/assets/favicon.png"
+                         },
+                 "plugins":  [
+                                 "expo-secure-store",
+                                 [
+                                     "expo-location",
+                                     {
+                                         "locationWhenInUsePermission":  "Allow BloodLink to use precise GPS so nearby donors and requests show accurate distances on the map."
+                                     }
+                                 ],
+                                 [
+                                     "expo-image-picker",
+                                     {
+                                         "photosPermission":  "Allow BloodLink to access your photos so you can set a profile picture."
+                                     }
+                                 ],
+                                 "expo-web-browser",
+                                 [
+                                     "expo-notifications",
+                                     {
+                                         "icon":  "./src/assets/icon.png",
+                                         "color":  "#b91c1c"
+                                     }
+                                 ],
+                                 "@maplibre/maplibre-react-native",
+                                 "@react-native-google-signin/google-signin",
+                                 "expo-status-bar"
+                             ],
+                 "extra":  {
+                               "eas":  {
+                                           "projectId":  "4e0d258f-9fe8-460e-a8e3-da476c5d50b8"
+                                       }
+                           },
+                 "owner":  "emkweklot"
+             }
 }

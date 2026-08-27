@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -99,13 +100,19 @@ export const OpenStreetMapView = forwardRef<OpenStreetMapViewHandle, OpenStreetM
             title: marker.title,
             description: marker.description,
             pinColor: marker.pinColor,
+            selectedPinColor: marker.selectedPinColor,
+            bloodType: marker.bloodType,
           })),
           selectedMarkerId,
           mapMode,
           resolvedUserLocation,
         ),
-      [mapMode, markers, region, resolvedUserLocation, selectedMarkerId],
+      [mapMode, markers, region, resolvedUserLocation],
     );
+
+    useEffect(() => {
+      webViewRef.current?.injectJavaScript(`window.__bloodlinkSetSelectedMarker?.(${JSON.stringify(selectedMarkerId)}); true;`);
+    }, [selectedMarkerId]);
 
     const containerStyle = useMemo(
       () => [

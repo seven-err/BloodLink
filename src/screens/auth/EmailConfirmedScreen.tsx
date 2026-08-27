@@ -56,9 +56,7 @@ const styles = StyleSheet.create({
   card: {
     alignItems: 'center',
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.cardLg,
-    borderWidth: 1,
     gap: 12,
     paddingHorizontal: 24,
     paddingVertical: 32,
@@ -73,7 +71,7 @@ const styles = StyleSheet.create({
   emailPill: {
     alignItems: 'center',
     backgroundColor: colors.successSoft,
-    borderColor: colors.success,
+    borderColor: colors.border,
     borderRadius: radii.pill,
     borderWidth: 1,
     flexDirection: 'row',

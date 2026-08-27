@@ -141,23 +141,7 @@ export const isDonorRecipientProfileComplete = (profile: Profile) => {
     return false;
   }
 
-  const hasBaseFields = Boolean(profile.full_name?.trim());
-
-  if (profile.role === 'donor') {
-    return (
-      hasBaseFields &&
-      Boolean(profile.blood_type) &&
-      Boolean(profile.birthdate) &&
-      profile.weight_kg !== null &&
-      profile.weight_kg >= 50
-    );
-  }
-
-  if (profile.role === 'recipient') {
-    return hasBaseFields && Boolean(profile.blood_type);
-  }
-
-  return false;
+  return Boolean(profile.full_name?.trim());
 };
 
 export const isProfileComplete = (profile: Profile) => {
@@ -172,7 +156,7 @@ export const isProfileComplete = (profile: Profile) => {
   return isDonorRecipientProfileComplete(profile);
 };
 
-export const completeProfile = ({
+export const completeProfile = async ({
   userId,
   fullName,
   role,
@@ -185,8 +169,8 @@ export const completeProfile = ({
   weightKg,
   lastDonationAt,
   isAvailable,
-}: ProfileCompletionInput) =>
-  supabase
+}: ProfileCompletionInput) => {
+  const result = await supabase
     .from('profiles')
     .upsert(
       {
@@ -201,6 +185,7 @@ export const completeProfile = ({
         weight_kg: role === 'donor' ? weightKg ?? null : null,
         last_donation_at: role === 'donor' ? lastDonationAt ?? null : null,
         is_available: role === 'donor' ? Boolean(isAvailable) : false,
+        visible_on_map: role === 'donor' && latitude != null && longitude != null,
         ...(phone?.trim() ? { phone: phone.trim() } : {}),
       },
       {
@@ -209,6 +194,29 @@ export const completeProfile = ({
     )
     .select()
     .single();
+
+  if (result.error) {
+    return result;
+  }
+
+  if (role === 'donor') {
+    // Immediately verify donor upon registration, bypassing pending and rejected
+    await supabase
+      .from('donor_verifications')
+      .insert({
+        donor_id: userId,
+        status: 'approved',
+        document_path: 'auto-verified',
+        notes: 'Automatically verified upon registration (bypass mode)',
+        reviewed_by: userId,
+        reviewed_at: new Date().toISOString(),
+      })
+      .select()
+      .maybeSingle();
+  }
+
+  return result;
+};
 
 export type AccountContactUpdateInput = {
   userId: string;
@@ -256,6 +264,7 @@ export const updateProfile = ({
       latitude: latitude ?? null,
       longitude: longitude ?? null,
       weight_kg: isDonor ? weightKg ?? null : null,
+      ...(isDonor && latitude != null && longitude != null ? { visible_on_map: true } : {}),
     })
     .eq('id', userId)
     .select()

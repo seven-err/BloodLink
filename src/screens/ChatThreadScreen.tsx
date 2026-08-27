@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ArrowLeft, Info, Send } from 'lucide-react-native';
@@ -24,6 +24,7 @@ import type { AppStackParamList } from '@/navigation/types';
 import { authStyles } from '@/screens/auth/styles';
 import { chatStyles } from '@/screens/chat/styles';
 import { recipientStyles } from '@/screens/recipient/styles';
+import { getBloodRequestById } from '@/services/supabase/bloodRequests';
 import {
   listMessages,
   markUnreadMessagesRead,
@@ -32,6 +33,8 @@ import {
   type AppMessage,
 } from '@/services/supabase/messages';
 import { subscribeToMessages } from '@/services/supabase/realtime';
+import { BloodType } from '@/types/database';
+import { appCache } from '@/utils/appCache';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'ChatThread'>;
 
@@ -61,14 +64,44 @@ export function ChatThreadScreen({ navigation, route }: Props) {
   const { bottom: bottomInset, top: topInset } = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
 
-  const [messages, setMessages] = useState<AppMessage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKeyMessages = `chat:messages:${bloodRequestId}:${donorMatchId}`;
+  const cacheKeyDetails = `chat:request_details:${bloodRequestId}`;
+
+  const cachedMessages = appCache.getSync<AppMessage[]>(cacheKeyMessages);
+  const cachedDetails = appCache.getSync<{
+    hospital_name: string;
+    patient_name: string | null;
+    blood_type: BloodType;
+  }>(cacheKeyDetails);
+
+  const [messages, setMessages] = useState<AppMessage[]>(() => cachedMessages ?? []);
+  const [loading, setLoading] = useState(() => !cachedMessages);
   const [error, setError] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const [draft, setDraft] = useState('');
   const [sendState, setSendState] = useState<SendState>('idle');
   const [sendError, setSendError] = useState<string | null>(null);
   const [safetyBannerVisible, setSafetyBannerVisible] = useState(true);
+  const [requestDetails, setRequestDetails] = useState<{
+    hospital_name: string;
+    patient_name: string | null;
+    blood_type: BloodType;
+  } | null>(() => cachedDetails ?? null);
+
+  useEffect(() => {
+    const fetchRequestDetails = async () => {
+      const { data, error: fetchError } = await getBloodRequestById(bloodRequestId);
+
+      if (fetchError) {
+        console.warn(`Could not fetch blood request details: ${fetchError.message}`);
+      } else if (data) {
+        setRequestDetails(data);
+        appCache.setSync(cacheKeyDetails, data);
+      }
+    };
+
+    void fetchRequestDetails();
+  }, [bloodRequestId, cacheKeyDetails]);
 
   const listRef = useRef<FlatList<AppMessage>>(null);
 
@@ -89,6 +122,21 @@ export function ChatThreadScreen({ navigation, route }: Props) {
     ? COMPOSER_SPACE + keyboardHeight + KEYBOARD_COMPOSER_LIFT
     : COMPOSER_SPACE + bottomInset;
 
+  const subtitleParts: string[] = [];
+  if (requestDetails) {
+    if (requestDetails.hospital_name) {
+      subtitleParts.push(requestDetails.hospital_name);
+    }
+    if (requestDetails.patient_name) {
+      subtitleParts.push(requestDetails.patient_name);
+    }
+    if (requestDetails.blood_type) {
+      subtitleParts.push(`Blood Type: ${requestDetails.blood_type}`);
+    }
+  }
+
+  const headerSubtitle = subtitleParts.length > 0 ? subtitleParts.join(' · ') : 'Secure match chat';
+
   const scrollToBottom = useCallback((animated = true) => {
     requestAnimationFrame(() => {
       listRef.current?.scrollToEnd({ animated });
@@ -103,7 +151,7 @@ export function ChatThreadScreen({ navigation, route }: Props) {
         return;
       }
 
-      if (!options?.silent) {
+      if (!options?.silent && !appCache.getSync(cacheKeyMessages)) {
         setLoading(true);
       }
 
@@ -113,7 +161,6 @@ export function ChatThreadScreen({ navigation, route }: Props) {
 
       if (authorization.kind === 'error') {
         setError(authorization.message);
-        setMessages([]);
         setLoading(false);
         return;
       }
@@ -121,29 +168,25 @@ export function ChatThreadScreen({ navigation, route }: Props) {
       if (authorization.kind === 'unauthorized') {
         setAccessDenied(true);
         setError(authorization.message);
-        setMessages([]);
         setLoading(false);
         return;
       }
-
-      setAccessDenied(false);
 
       const { data, error: fetchError } = await listMessages(conversationContext);
 
       if (fetchError) {
         setError(fetchError.message);
-        setMessages([]);
-        setLoading(false);
-        return;
+      } else {
+        const fresh = data ?? [];
+        setMessages(fresh);
+        appCache.setSync(cacheKeyMessages, fresh);
+        scrollToBottom(false);
+        void markUnreadMessagesRead(fresh, currentUserId);
       }
 
-      const nextMessages = data ?? [];
-      setMessages(nextMessages);
       setLoading(false);
-
-      await markUnreadMessagesRead(nextMessages, currentUserId);
     },
-    [conversationContext, currentUserId],
+    [conversationContext, currentUserId, cacheKeyMessages, scrollToBottom],
   );
 
   useFocusEffect(
@@ -180,14 +223,19 @@ export function ChatThreadScreen({ navigation, route }: Props) {
     if (result.kind === 'success') {
       setDraft('');
       setSendState('idle');
-      setMessages((current) => [...current, result.message]);
+      setMessages((current) => {
+        const next = [...current, result.message];
+        appCache.setSync(cacheKeyMessages, next);
+        return next;
+      });
+      appCache.invalidate(`conversations:${currentUserId}`);
       scrollToBottom();
       return;
     }
 
     setSendState('error');
     setSendError(result.message);
-  }, [bloodRequestId, currentUserId, donorMatchId, draft, recipientId, scrollToBottom]);
+  }, [bloodRequestId, cacheKeyMessages, currentUserId, donorMatchId, draft, recipientId, scrollToBottom]);
 
   const showSafetyBanner = useCallback(() => {
     void showChatSafetyBanner().then(() => {
@@ -232,7 +280,7 @@ export function ChatThreadScreen({ navigation, route }: Props) {
           <Text numberOfLines={1} style={chatStyles.headerTitle}>
             {headerLabel}
           </Text>
-          <Text style={chatStyles.headerSubtitle}>Secure match chat</Text>
+          <Text style={chatStyles.headerSubtitle}>{headerSubtitle}</Text>
         </View>
         {!safetyBannerVisible ? (
           <Pressable

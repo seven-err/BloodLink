@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as Location from 'expo-location';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArrowLeft, MapPin } from 'lucide-react-native';
+import { ArrowLeft, Droplets, MapPin } from 'lucide-react-native';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
@@ -28,11 +28,9 @@ import type { AppStackParamList } from '@/navigation/types';
 import { createBloodRequestStyles } from '@/screens/recipient/createBloodRequestStyles';
 import { getHighAccuracyPosition } from '@/services/location/getHighAccuracyPosition';
 import { createBloodRequest } from '@/services/supabase/bloodRequests';
-import {
-  uploadBloodRequestAttachment,
-  type LocalDocument,
-} from '@/services/supabase/storageUpload';
+import { uploadBloodRequestAttachment, type LocalDocument } from '@/services/supabase/storageUpload';
 import type { BloodType } from '@/types/database';
+import { appCache } from '@/utils/appCache';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'CreateBloodRequest'>;
 
@@ -45,18 +43,14 @@ const getDefaultNeededAt = () => {
 const bloodRequestSchema = z.object({
   address: z.string().trim().min(3, 'Location is required.'),
   bloodType: z.enum(BLOOD_TYPES as [BloodType, ...BloodType[]]),
-  contactPerson: z
-    .string()
-    .trim()
-    .min(3, 'Contact person details are required.'),
-  hospitalName: z.string().trim().min(2, 'Hospital name is required.'),
+  hospitalName: z.string().trim().min(2, 'Hospital or facility name is required.'),
   notes: z.string().trim().optional(),
   patientName: z.string().trim().min(2, 'Patient name or label is required.'),
   unitsNeeded: z
-    .string()
-    .trim()
-    .regex(/^\d+$/, 'Units needed must be a whole number.')
-    .refine((value) => Number(value) > 0, 'Units needed must be at least 1.'),
+    .number()
+    .int()
+    .min(1, 'At least 1 unit is required.')
+    .max(20, 'Maximum 20 units.'),
   urgencyLevel: z.enum(['low', 'medium', 'high', 'critical']),
 });
 
@@ -90,11 +84,10 @@ export function CreateBloodRequestScreen({ navigation, route }: Props) {
     defaultValues: {
       address: profile?.address ?? '',
       bloodType: route.params?.bloodType ?? profile?.blood_type ?? BLOOD_TYPES[0],
-      contactPerson: profile?.phone ?? '',
       hospitalName: '',
       notes: '',
       patientName: '',
-      unitsNeeded: '1',
+      unitsNeeded: 1,
       urgencyLevel: 'medium',
     },
     resolver: zodResolver(bloodRequestSchema),
@@ -102,6 +95,7 @@ export function CreateBloodRequestScreen({ navigation, route }: Props) {
 
   const selectedBloodType = watch('bloodType');
   const selectedUrgencyLevel = watch('urgencyLevel');
+  const unitsNeeded = watch('unitsNeeded');
 
   const captureLocation = async () => {
     if (locating) {
@@ -136,7 +130,7 @@ export function CreateBloodRequestScreen({ navigation, route }: Props) {
         latitude: currentPosition.coords.latitude,
         longitude: currentPosition.coords.longitude,
       });
-      setLocationMessage('Current location captured. Add an address for donors if needed.');
+      setLocationMessage('GPS location captured. Add an address for donors.');
     } catch {
       setLocationMessage('Unable to capture location. Enter an address manually.');
     } finally {
@@ -168,7 +162,7 @@ export function CreateBloodRequestScreen({ navigation, route }: Props) {
         address: values.address,
         attachmentPath,
         bloodType: values.bloodType,
-        contactPhone: values.contactPerson,
+        contactPhone: profile?.phone ?? null,
         hospitalName: values.hospitalName,
         latitude: coordinates.latitude,
         longitude: coordinates.longitude,
@@ -176,7 +170,7 @@ export function CreateBloodRequestScreen({ navigation, route }: Props) {
         notes: values.notes || null,
         patientName: values.patientName,
         requesterId: session.user.id,
-        unitsNeeded: Number(values.unitsNeeded),
+        unitsNeeded: values.unitsNeeded,
         urgency: mapFormUrgencyToDb(values.urgencyLevel),
       });
 
@@ -190,6 +184,11 @@ export function CreateBloodRequestScreen({ navigation, route }: Props) {
         return;
       }
 
+      appCache.invalidate('feed:open_requests');
+      appCache.invalidate(`recipient:my_requests:${session.user.id}`);
+      appCache.invalidate(`recipient:active_request_count:${session.user.id}`);
+      appCache.setSync(`blood_request:detail:${data.id}`, data);
+
       navigation.replace('BloodRequestDetail', { requestId: data.id });
     } catch (submitError) {
       setError(
@@ -202,11 +201,17 @@ export function CreateBloodRequestScreen({ navigation, route }: Props) {
     }
   };
 
+  const adjustUnits = (delta: number) => {
+    const next = Math.max(1, Math.min(20, unitsNeeded + delta));
+    setValue('unitsNeeded', next, { shouldValidate: true });
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={createBloodRequestStyles.screen}
     >
+      {/* Header */}
       <View style={[createBloodRequestStyles.header, { paddingTop: topInset + 8 }]}>
         <Pressable
           accessibilityLabel="Go back"
@@ -216,140 +221,200 @@ export function CreateBloodRequestScreen({ navigation, route }: Props) {
         >
           <ArrowLeft color={colors.foreground} size={22} />
         </Pressable>
-        <Text style={createBloodRequestStyles.headerTitle}>Create Blood Request</Text>
+        <Text style={createBloodRequestStyles.headerTitle}>New Blood Request</Text>
       </View>
 
       <ScrollView
         contentContainerStyle={createBloodRequestStyles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <Controller
-          control={control}
-          name="patientName"
-          render={({ field: { onBlur, onChange, value } }) => (
-            <RequestFormField
-              error={errors.patientName?.message}
-              label="Patient Name / Request Label"
-              placeholder="Enter patient name or label"
-              value={value}
-              onBlur={onBlur}
-              onChangeText={onChange}
-            />
-          )}
-        />
+        {/* Hero Banner */}
+        <View style={createBloodRequestStyles.heroBanner}>
+          <View style={createBloodRequestStyles.heroBannerIcon}>
+            <Droplets color={colors.primaryForeground} size={26} />
+          </View>
+          <View style={createBloodRequestStyles.heroBannerText}>
+            <Text style={createBloodRequestStyles.heroBannerTitle}>Request Blood Donation</Text>
+            <Text style={createBloodRequestStyles.heroBannerSubtitle}>
+              Fill in the details below. Nearby donors will be notified instantly.
+            </Text>
+          </View>
+        </View>
 
-        <BloodTypeSelector
-          error={errors.bloodType?.message}
-          value={selectedBloodType}
-          onChange={(bloodType) =>
-            setValue('bloodType', bloodType, { shouldValidate: true })
-          }
-        />
+        {/* Section 1: Patient & Request Info */}
+        <View style={createBloodRequestStyles.section}>
+          <Text style={createBloodRequestStyles.sectionTitle}>Patient Information</Text>
+          <View style={createBloodRequestStyles.sectionCard}>
 
-        <Controller
-          control={control}
-          name="unitsNeeded"
-          render={({ field: { onBlur, onChange, value } }) => (
-            <RequestFormField
-              error={errors.unitsNeeded?.message}
-              keyboardType="number-pad"
-              label="Number of Units"
-              placeholder="Enter number of units"
-              value={value}
-              onBlur={onBlur}
-              onChangeText={onChange}
-            />
-          )}
-        />
+          <Controller
+            control={control}
+            name="patientName"
+            render={({ field: { onBlur, onChange, value } }) => (
+              <RequestFormField
+                error={errors.patientName?.message}
+                label="Patient Name / Label"
+                placeholder="e.g. Juan Dela Cruz"
+                value={value}
+                onBlur={onBlur}
+                onChangeText={onChange}
+              />
+            )}
+          />
 
-        <Controller
-          control={control}
-          name="hospitalName"
-          render={({ field: { onBlur, onChange, value } }) => (
-            <RequestFormField
-              error={errors.hospitalName?.message}
-              label="Hospital / Medical Facility"
-              placeholder="Enter hospital name"
-              value={value}
-              onBlur={onBlur}
-              onChangeText={onChange}
-            />
-          )}
-        />
+          <Controller
+            control={control}
+            name="hospitalName"
+            render={({ field: { onBlur, onChange, value } }) => (
+              <RequestFormField
+                error={errors.hospitalName?.message}
+                label="Hospital / Facility"
+                placeholder="e.g. Philippine General Hospital"
+                value={value}
+                onBlur={onBlur}
+                onChangeText={onChange}
+              />
+            )}
+          />
+          </View>
+        </View>
 
-        <Controller
-          control={control}
-          name="address"
-          render={({ field: { onBlur, onChange, value } }) => (
-            <RequestFormField
-              error={errors.address?.message}
-              label="Location"
-              leftIcon={
-                <Pressable
-                  accessibilityLabel="Use current location"
-                  accessibilityRole="button"
-                  disabled={locating}
-                  style={createBloodRequestStyles.locationIcon}
-                  onPress={() => void captureLocation()}
-                >
-                  {locating ? (
-                    <ActivityIndicator color={colors.mutedLight} size="small" />
-                  ) : (
-                    <MapPin color={colors.mutedLight} size={18} />
-                  )}
-                </Pressable>
-              }
-              placeholder="Enter address or use current location"
-              value={value}
-              onBlur={onBlur}
-              onChangeText={onChange}
-            />
-          )}
-        />
-        {locationMessage ? (
-          <Text style={createBloodRequestStyles.helperText}>{locationMessage}</Text>
-        ) : null}
+        {/* Section 2: Blood Type & Units */}
+        <View style={createBloodRequestStyles.section}>
+          <Text style={createBloodRequestStyles.sectionTitle}>Blood Requirements</Text>
+          <View style={createBloodRequestStyles.sectionCard}>
 
-        <FormUrgencySelector
-          error={errors.urgencyLevel?.message}
-          value={selectedUrgencyLevel}
-          onChange={(urgencyLevel) =>
-            setValue('urgencyLevel', urgencyLevel, { shouldValidate: true })
-          }
-        />
+          <BloodTypeSelector
+            error={errors.bloodType?.message}
+            value={selectedBloodType}
+            onChange={(bloodType) =>
+              setValue('bloodType', bloodType, { shouldValidate: true })
+            }
+          />
 
-        <Controller
-          control={control}
-          name="notes"
-          render={({ field: { onBlur, onChange, value } }) => (
-            <RequestFormField
-              error={errors.notes?.message}
-              label="Medical Note (Optional)"
-              multiline
-              placeholder="Add any relevant medical information"
-              value={value}
-              onBlur={onBlur}
-              onChangeText={onChange}
-            />
-          )}
-        />
+          {/* Units Stepper */}
+          <View style={createBloodRequestStyles.field}>
+            <Text style={createBloodRequestStyles.fieldLabel}>Units Needed</Text>
+            <View style={createBloodRequestStyles.stepperRow}>
+              <Pressable
+                accessibilityLabel="Decrease units"
+                accessibilityRole="button"
+                style={createBloodRequestStyles.stepperButton}
+                onPress={() => adjustUnits(-1)}
+              >
+                <Text style={createBloodRequestStyles.stepperButtonText}>−</Text>
+              </Pressable>
+              <Text style={createBloodRequestStyles.stepperValue}>{unitsNeeded}</Text>
+              <Pressable
+                accessibilityLabel="Increase units"
+                accessibilityRole="button"
+                style={createBloodRequestStyles.stepperButton}
+                onPress={() => adjustUnits(1)}
+              >
+                <Text style={createBloodRequestStyles.stepperButtonText}>+</Text>
+              </Pressable>
+              <Text style={createBloodRequestStyles.stepperUnit}>
+                {unitsNeeded === 1 ? 'unit' : 'units'}
+              </Text>
+            </View>
+            {errors.unitsNeeded ? (
+              <Text style={createBloodRequestStyles.errorText}>{errors.unitsNeeded.message}</Text>
+            ) : null}
+          </View>
 
-        <Controller
-          control={control}
-          name="contactPerson"
-          render={({ field: { onBlur, onChange, value } }) => (
-            <RequestFormField
-              error={errors.contactPerson?.message}
-              label="Contact Person"
-              placeholder="Name and phone number"
-              value={value}
-              onBlur={onBlur}
-              onChangeText={onChange}
-            />
-          )}
-        />
+          <FormUrgencySelector
+            error={errors.urgencyLevel?.message}
+            value={selectedUrgencyLevel}
+            onChange={(urgencyLevel) =>
+              setValue('urgencyLevel', urgencyLevel, { shouldValidate: true })
+            }
+          />
+          </View>
+        </View>
 
-        <MedicalDocumentUploadField document={document} onChange={setDocument} />
+        {/* Section 3: Location */}
+        <View style={createBloodRequestStyles.section}>
+          <Text style={createBloodRequestStyles.sectionTitle}>Location</Text>
+          <View style={createBloodRequestStyles.sectionCard}>
+
+          {/* GPS Capture Button */}
+          <Pressable
+            accessibilityLabel="Use current location"
+            accessibilityRole="button"
+            disabled={locating}
+            style={({ pressed }) => [
+              createBloodRequestStyles.locationButton,
+              pressed && { opacity: 0.8 },
+            ]}
+            onPress={() => void captureLocation()}
+          >
+            {locating ? (
+              <ActivityIndicator color={colors.mutedLight} size="small" />
+            ) : (
+              <MapPin
+                color={coordinates.latitude != null ? colors.primary : colors.mutedLight}
+                size={18}
+              />
+            )}
+            <Text
+              style={[
+                createBloodRequestStyles.locationButtonText,
+                coordinates.latitude != null
+                  ? createBloodRequestStyles.locationButtonTextActive
+                  : null,
+              ]}
+            >
+              {locating
+                ? 'Getting location…'
+                : coordinates.latitude != null
+                  ? 'GPS location captured'
+                  : 'Use current GPS location'}
+            </Text>
+          </Pressable>
+          {locationMessage ? (
+            <Text style={createBloodRequestStyles.helperText}>{locationMessage}</Text>
+          ) : null}
+
+          <Controller
+            control={control}
+            name="address"
+            render={({ field: { onBlur, onChange, value } }) => (
+              <RequestFormField
+                error={errors.address?.message}
+                label="Address / Landmark"
+                placeholder="Enter address for donors (e.g. ward, floor)"
+                value={value}
+                onBlur={onBlur}
+                onChangeText={onChange}
+              />
+            )}
+          />
+          </View>
+        </View>
+
+        {/* Section 4: Additional Details */}
+        <View style={createBloodRequestStyles.section}>
+          <Text style={createBloodRequestStyles.sectionTitle}>Additional Details</Text>
+          <View style={createBloodRequestStyles.sectionCard}>
+
+          <Controller
+            control={control}
+            name="notes"
+            render={({ field: { onBlur, onChange, value } }) => (
+              <RequestFormField
+                error={errors.notes?.message}
+                label="Medical Note (Optional)"
+                multiline
+                placeholder="Any relevant medical information for the donor"
+                value={value}
+                onBlur={onBlur}
+                onChangeText={onChange}
+              />
+            )}
+          />
+
+          <MedicalDocumentUploadField document={document} onChange={setDocument} />
+          </View>
+        </View>
 
         {error ? <Text style={createBloodRequestStyles.errorText}>{error}</Text> : null}
       </ScrollView>

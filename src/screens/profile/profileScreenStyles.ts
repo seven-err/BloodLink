@@ -1,4 +1,4 @@
-﻿import { StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import { colors, radii, shadows } from '@/constants/theme';
 
@@ -36,9 +36,7 @@ export const profileScreenStyles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 16,
     padding: 20,
     ...shadows.card,
@@ -80,13 +78,44 @@ export const profileScreenStyles = StyleSheet.create({
     height: 1,
     width: '100%',
   },
+  donationBadgeRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  donationBloodBadge: {
+    alignItems: 'center',
+    backgroundColor: colors.primarySoft,
+    borderRadius: radii.pill,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  donationBloodBadgeText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '800',
+  },
   donationDate: {
     color: colors.muted,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
+  },
+  donationDateRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+  },
+  donationHeaderRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'space-between',
   },
   donationHospital: {
     color: colors.foreground,
+    flex: 1,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -94,37 +123,140 @@ export const profileScreenStyles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.primarySoft,
     borderRadius: 999,
-    height: 40,
+    height: 36,
     justifyContent: 'center',
-    width: 40,
+    width: 36,
   },
   donationItem: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    gap: 10,
+    padding: 14,
+  },
+  donationMetaRow: {
     alignItems: 'center',
-    backgroundColor: colors.background,
-    borderRadius: 12,
     flexDirection: 'row',
-    gap: 12,
-    padding: 12,
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  donationStatusPill: {
+    alignItems: 'center',
+    backgroundColor: colors.successSoft,
+    borderRadius: radii.pill,
+    flexDirection: 'row',
+    flexShrink: 0,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  donationStatusPillActive: {
+    backgroundColor: colors.infoSoft,
+  },
+  donationStatusText: {
+    color: colors.success,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  donationStatusTextActive: {
+    color: colors.infoText,
   },
   donationTextWrap: {
     flex: 1,
     gap: 2,
   },
+  donationUnitsText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  actionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    width: '100%',
+  },
   editProfileButton: {
     alignItems: 'center',
     backgroundColor: '#f8fafc',
-    borderColor: colors.border,
     borderRadius: 12,
-    borderWidth: 1,
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     justifyContent: 'center',
-    paddingVertical: 12,
+    minHeight: 46,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    width: '100%',
+  },
+  editProfileButtonDonor: {
+    flex: 1.1,
+    minWidth: 0,
+    paddingHorizontal: 8,
+    width: 'auto',
   },
   editProfileText: {
     color: colors.foreground,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
+  },
+  qrButton: {
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    height: 46,
+    justifyContent: 'center',
+    width: 46,
+  },
+  availabilityCard: {
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    flex: 1.3,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: 46,
+    minWidth: 0,
+    paddingHorizontal: 10,
+  },
+  availabilityCardActive: {
+    backgroundColor: colors.successSoft,
+  },
+  availabilityCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
+  },
+  availabilityTitleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+  },
+  availabilityTitle: {
+    color: colors.foreground,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  availabilityStatus: {
+    color: colors.mutedLight,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  availabilityStatusActive: {
+    color: colors.success,
+    fontWeight: '700',
+  },
+  availabilityError: {
+    color: colors.primary,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: -8,
+  },
+  availabilityHint: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: -8,
   },
   emptyDonationsText: {
     color: colors.muted,
@@ -133,8 +265,6 @@ export const profileScreenStyles = StyleSheet.create({
   },
   header: {
     backgroundColor: colors.card,
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
     paddingBottom: 16,
     paddingHorizontal: 24,
   },
@@ -164,9 +294,7 @@ export const profileScreenStyles = StyleSheet.create({
   logoutButton: {
     alignItems: 'center',
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
@@ -218,30 +346,12 @@ export const profileScreenStyles = StyleSheet.create({
   },
   profileCard: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: 20,
     padding: 20,
     ...shadows.card,
   },
-  modeCard: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    gap: 16,
-    padding: 20,
-    ...shadows.card,
-  },
-  statsCard: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    padding: 20,
-    ...shadows.card,
-  },
+
   statDivider: {
     backgroundColor: colors.border,
     height: '60%',
@@ -256,30 +366,15 @@ export const profileScreenStyles = StyleSheet.create({
   nameRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    flexWrap: 'wrap',
+    gap: 6,
     minWidth: 0,
   },
   overviewMeta: {
     flex: 1,
     gap: 6,
   },
-  modeSection: {
-    gap: 6,
-  },
-  modeStatusLabel: {
-    color: colors.foreground,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  modeSubtitle: {
-    color: colors.muted,
-    fontSize: 13,
-    fontWeight: '500',
-    lineHeight: 18,
-  },
-  modeToggleWrap: {
-    marginTop: 8,
-  },
+
   roleLabel: {
     color: colors.muted,
     fontSize: 14,

@@ -12,13 +12,17 @@ module.exports = ({ config }) => {
       return plugin;
     }
 
-    return [
+      return [
       '@react-native-google-signin/google-signin',
       {
         iosUrlScheme,
       },
     ];
   });
+
+  if (!plugins.includes('expo-splash-screen')) {
+    plugins.push('expo-splash-screen');
+  }
 
   return {
     ...config,

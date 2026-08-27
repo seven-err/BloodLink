@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors } from '@/constants/theme';
+import { colors, fontFamilies } from '@/constants/theme';
 import type { BloodType } from '@/types/database';
 
 type BloodTypeBadgeProps = {
@@ -38,13 +38,11 @@ export function BloodTypeBadge({
 const styles = StyleSheet.create({
   badge: {
     alignItems: 'center',
-    backgroundColor: colors.primarySoft,
+    backgroundColor: '#F1F5F9',
     borderRadius: 12,
+    height: 44,
     justifyContent: 'center',
-    minHeight: 40,
-    minWidth: 48,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    width: 44,
   },
   badgeLg: {
     borderRadius: 14,
@@ -57,8 +55,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   text: {
-    color: colors.primary,
-    fontSize: 14,
+    color: '#0F172A',
+    fontFamily: fontFamilies.displayHeavy,
+    fontSize: 16,
     fontWeight: '800',
   },
   textLg: {

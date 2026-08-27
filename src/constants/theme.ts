@@ -2,7 +2,7 @@ export const colors = {
   background: '#f9fafb',
   backgroundTint: '#fef2f2',
   border: '#e2e8f0',
-  borderAccent: '#fecaca',
+  borderAccent: '#e2e8f0',
   card: '#ffffff',
   foreground: '#1a1a1a',
   muted: '#64748b',
@@ -16,7 +16,7 @@ export const colors = {
   successSoft: '#dcfce7',
   warning: '#f59e0b',
   warningSoft: '#fef3c7',
-  warningBorder: '#fcd34d',
+  warningBorder: '#e2e8f0',
   warningText: '#92400e',
   info: '#3b82f6',
   infoSoft: '#dbeafe',
@@ -33,10 +33,12 @@ export const radii = {
 
 export const shadows = {
   card: {
-    elevation: 2,
+    elevation: 0,
     shadowColor: '#000',
     shadowOffset: { height: 1, width: 0 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.015,
     shadowRadius: 8,
   },
 } as const;
+
+export { fontFamilies, typography } from './typography';
